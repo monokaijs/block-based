@@ -1318,6 +1318,7 @@ function SortableBlockItem({
   return (
     <div
       ref={setNodeRef}
+      data-block-id={block.id}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -1985,6 +1986,16 @@ const BLOCK_LAYOUTS: Array<{ id: string; columns: number[] }> = [
   { id: 'split-focus', columns: [40, 20, 40] },
 ];
 
+let transparentDragImage: HTMLImageElement | null = null;
+
+function suppressNativeDragImage(event: React.DragEvent<HTMLElement>): void {
+  if (!transparentDragImage) {
+    transparentDragImage = new Image();
+    transparentDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+  }
+  event.dataTransfer.setDragImage(transparentDragImage, 0, 0);
+}
+
 function RailItem({
   label,
   Icon,
@@ -2041,13 +2052,21 @@ function RailItem({
   );
 }
 
-function LayoutRowPreview({ columns }: { columns: number[] }) {
+function LayoutRowPreview({
+  columns,
+  onPreviewDragStart,
+}: {
+  columns: number[];
+  onPreviewDragStart: (columns: number[], event: React.DragEvent<HTMLElement>) => void;
+}) {
   return (
     <div
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(ROW_DRAG_TYPE, JSON.stringify(columns));
         e.dataTransfer.effectAllowed = 'copy';
+        suppressNativeDragImage(e);
+        onPreviewDragStart(columns, e);
       }}
       style={{
         width: '100%',
@@ -2086,6 +2105,8 @@ function Sidebar({
   onUpdateSection,
   onDeleteSection,
   onClearSelection,
+  onPaletteBlockDragStart,
+  onPaletteRowDragStart,
 }: {
   activeTab: 'blocks' | 'sections' | 'settings';
   onTabChange: (t: 'blocks' | 'sections' | 'settings') => void;
@@ -2100,6 +2121,8 @@ function Sidebar({
   onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
   onDeleteSection: (sId: string) => void;
   onClearSelection: () => void;
+  onPaletteBlockDragStart: (type: EmailBlockType, event: React.DragEvent<HTMLElement>) => void;
+  onPaletteRowDragStart: (columns: number[], event: React.DragEvent<HTMLElement>) => void;
 }) {
   const shellStyle: React.CSSProperties = {
     width: 380,
@@ -2233,6 +2256,7 @@ function Sidebar({
             <LayoutRowPreview
               key={layout.id}
               columns={layout.columns}
+              onPreviewDragStart={onPaletteRowDragStart}
             />
           ))}
         </div>
@@ -2265,7 +2289,12 @@ function Sidebar({
           key={label}
           draggable
           data-drag-kind="row"
-          onDragStart={(e) => { e.dataTransfer.setData(ROW_DRAG_TYPE, JSON.stringify(columns)); e.dataTransfer.effectAllowed = 'copy'; }}
+          onDragStart={(e) => {
+            e.dataTransfer.setData(ROW_DRAG_TYPE, JSON.stringify(columns));
+            e.dataTransfer.effectAllowed = 'copy';
+            suppressNativeDragImage(e);
+            onPaletteRowDragStart(columns, e);
+          }}
           title={`${desc} — drag into canvas`}
           style={{
             display: 'flex',
@@ -2293,7 +2322,12 @@ function Sidebar({
           key={type}
           draggable
           data-drag-kind="block"
-          onDragStart={(e) => { e.dataTransfer.setData(BLOCK_DRAG_TYPE, type); e.dataTransfer.effectAllowed = 'copy'; }}
+          onDragStart={(e) => {
+            e.dataTransfer.setData(BLOCK_DRAG_TYPE, type);
+            e.dataTransfer.effectAllowed = 'copy';
+            suppressNativeDragImage(e);
+            onPaletteBlockDragStart(type, e);
+          }}
           title={`${desc} — drag into a row column`}
           style={{
             display: 'flex',
@@ -2458,7 +2492,11 @@ function Canvas({
       const blockId = String(event.active.id);
       const location = findBlockLocation(blockId);
       if (!location) return;
-      const measuredWidth = event.active.rect.current.initial?.width;
+      const dragElement = document.querySelector<HTMLElement>(`[data-block-id="${blockId}"]`);
+      const measuredWidth =
+        dragElement?.getBoundingClientRect().width ??
+        event.active.rect.current.initial?.width ??
+        null;
       setActiveBlockOverlayWidth(typeof measuredWidth === 'number' ? measuredWidth : null);
       setActiveBlockId(blockId);
       setDraggingPayload({
@@ -2638,7 +2676,7 @@ function Canvas({
         </div>
         <DragOverlay>
           {activeBlock ? (
-            <div style={{ width: activeBlockOverlayWidth ?? 320, pointerEvents: 'none' }}>
+            <div style={{ width: activeBlockOverlayWidth ?? undefined, pointerEvents: 'none' }}>
               <BlockPreview
                 block={activeBlock}
                 fontFamily={doc.settings.fontFamily}
@@ -2662,6 +2700,11 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const [selection, setSelection] = useState<Selection>(null);
   const [activeTab, setActiveTab] = useState<'blocks' | 'sections' | 'settings'>('blocks');
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [paletteDragPreview, setPaletteDragPreview] = useState<
+    | { kind: 'block'; block: EmailBlock; x: number; y: number }
+    | { kind: 'row'; columns: number[]; x: number; y: number }
+    | null
+  >(null);
 
   const update = useCallback(
     (next: EmailDocument) => {
@@ -2869,8 +2912,51 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
     [doc, update],
   );
 
+  const startPaletteBlockPreview = useCallback((type: EmailBlockType, event: React.DragEvent<HTMLElement>) => {
+    setPaletteDragPreview({
+      kind: 'block',
+      block: createBlock(type),
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
+  const startPaletteRowPreview = useCallback((columns: number[], event: React.DragEvent<HTMLElement>) => {
+    setPaletteDragPreview({
+      kind: 'row',
+      columns,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!paletteDragPreview) return;
+
+    const onDragOver = (event: DragEvent) => {
+      setPaletteDragPreview((current) => {
+        if (!current) return current;
+        return { ...current, x: event.clientX, y: event.clientY };
+      });
+    };
+
+    const clearPreview = () => {
+      setPaletteDragPreview(null);
+    };
+
+    window.addEventListener('dragover', onDragOver, true);
+    window.addEventListener('dragend', clearPreview, true);
+    window.addEventListener('drop', clearPreview, true);
+
+    return () => {
+      window.removeEventListener('dragover', onDragOver, true);
+      window.removeEventListener('dragend', clearPreview, true);
+      window.removeEventListener('drop', clearPreview, true);
+    };
+  }, [paletteDragPreview]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13, position: 'relative' }}>
       <Toolbar previewMode={previewMode} onPreviewMode={setPreviewMode} />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Sidebar
@@ -2887,6 +2973,8 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           onUpdateSection={updateSection}
           onDeleteSection={deleteSection}
           onClearSelection={() => setSelection(null)}
+          onPaletteBlockDragStart={startPaletteBlockPreview}
+          onPaletteRowDragStart={startPaletteRowPreview}
         />
         <Canvas
           doc={doc}
@@ -2904,6 +2992,46 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           onClearSelection={() => setSelection(null)}
         />
       </div>
+      {paletteDragPreview && (
+        <div
+          style={{
+            position: 'fixed',
+            left: paletteDragPreview.x + 12,
+            top: paletteDragPreview.y + 12,
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}
+        >
+          {paletteDragPreview.kind === 'block' ? (
+            <div style={{ width: 320, pointerEvents: 'none' }}>
+              <BlockPreview
+                block={paletteDragPreview.block}
+                fontFamily={doc.settings.fontFamily}
+                isSelected={false}
+                onClick={() => {}}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                width: 220,
+                display: 'grid',
+                gridTemplateColumns: paletteDragPreview.columns.map((width) => `${width}fr`).join(' '),
+                border: `1px solid ${C.inspectorBorder}`,
+                borderRadius: 6,
+                overflow: 'hidden',
+                background: '#ffffff',
+                minHeight: 58,
+                boxShadow: '0 4px 18px rgba(0,0,0,.14)',
+              }}
+            >
+              {paletteDragPreview.columns.map((_, index) => (
+                <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${C.inspectorBorder}` }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
