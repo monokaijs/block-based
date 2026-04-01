@@ -6,10 +6,12 @@ import {
   DragOverlay,
   PointerSensor,
   closestCenter,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -2580,6 +2582,22 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const [paletteDropTarget, setPaletteDropTarget] = useState<{ sectionId: string; columnId: string; index: number } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // Custom collision detection: prefer pointerWithin (respects full block rect)
+  // and prioritise block-level droppables over column-level ones.
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const within = pointerWithin(args);
+    if (within.length > 0) {
+      // Prefer block hits over column hits
+      const blockHit = within.find((c) => {
+        const d = c.data?.droppableContainer?.data?.current as Record<string, unknown> | undefined;
+        return d?.kind === 'block';
+      });
+      if (blockHit) return [blockHit];
+      return within;
+    }
+    return closestCenter(args);
+  }, []);
+
   const update = useCallback(
     (next: EmailDocument) => {
       setDoc(next);
@@ -2811,7 +2829,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
     : null;
 
   const resolveDropTarget = useCallback(
-    (over: DragEndEvent['over'] | DragOverEvent['over']) => {
+    (over: DragEndEvent['over'] | DragOverEvent['over'], pointerY?: number) => {
       if (!over) return null;
       const overData = over.data.current as
         | { kind?: 'block'; sectionId?: string; columnId?: string }
@@ -2827,6 +2845,19 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
 
       const blockLocation = findBlockLocation(String(over.id));
       if (!blockLocation) return null;
+
+      // If we have a pointer Y, decide whether to insert before or after the
+      // hovered block based on which half the pointer is in.
+      if (typeof pointerY === 'number') {
+        const el = document.querySelector<HTMLElement>(`[data-block-id="${over.id}"]`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (pointerY > rect.top + rect.height / 2) {
+            return { ...blockLocation, index: blockLocation.index + 1 };
+          }
+        }
+      }
+
       return blockLocation;
     },
     [doc.sections, findBlockLocation],
@@ -2879,7 +2910,8 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
 
       // Track palette drop target for placeholder rendering
       if (kind === 'palette-block') {
-        const target = resolveDropTarget(event.over);
+        const pointerY = (event.activatorEvent as PointerEvent).clientY + event.delta.y;
+        const target = resolveDropTarget(event.over, pointerY);
         setPaletteDropTarget(target);
         return;
       }
@@ -3010,7 +3042,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
       <Toolbar previewMode={previewMode} onPreviewMode={setPreviewMode} />
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
