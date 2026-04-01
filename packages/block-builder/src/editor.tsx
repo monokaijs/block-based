@@ -1427,11 +1427,30 @@ function DropZone({
 }) {
   const [over, setOver] = useState(false);
   const [dropMode, setDropMode] = useState<'new' | 'move' | null>(null);
+  const leaveTimerRef = useRef<number | null>(null);
+
+  const clearLeaveTimer = () => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+  };
 
   const resetState = () => {
+    clearLeaveTimer();
     setOver(false);
     setDropMode(null);
     onMoveHoverChange?.(false);
+  };
+
+  const scheduleReset = () => {
+    clearLeaveTimer();
+    leaveTimerRef.current = window.setTimeout(() => {
+      setOver(false);
+      setDropMode(null);
+      onMoveHoverChange?.(false);
+      leaveTimerRef.current = null;
+    }, 80);
   };
 
   useEffect(() => {
@@ -1440,6 +1459,12 @@ function DropZone({
     }
   }, [isDragging]);
 
+  useEffect(() => {
+    return () => {
+      clearLeaveTimer();
+    };
+  }, []);
+
   const onZoneDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     const isNewBlock = e.dataTransfer.types.includes(BLOCK_DRAG_TYPE);
     const isExistingBlock = e.dataTransfer.types.includes(BLOCK_INSTANCE_DRAG_TYPE);
@@ -1447,15 +1472,16 @@ function DropZone({
 
     e.preventDefault();
     e.stopPropagation();
+    clearLeaveTimer();
     setOver(true);
     setDropMode(isExistingBlock ? 'move' : 'new');
     onMoveHoverChange?.(isExistingBlock);
   };
 
-  const onZoneDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      resetState();
-    }
+  const onZoneDragLeave = () => {
+    // Drag leave often fires transiently when crossing tiny hit boundaries.
+    // Delay reset slightly so snap preview stays stable near zone edges.
+    scheduleReset();
   };
 
   const onZoneDrop = (e: React.DragEvent<HTMLDivElement>) => {
