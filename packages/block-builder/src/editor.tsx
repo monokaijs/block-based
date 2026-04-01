@@ -2398,6 +2398,7 @@ function Canvas({
   const [draggingPayload, setDraggingPayload] = useState<BlockDragPayload | null>(null);
   const isRowDragging = isDragging && (dragKind === 'row' || dragKind === 'section');
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [activeBlockOverlayWidth, setActiveBlockOverlayWidth] = useState<number | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const findBlockLocation = useCallback(
@@ -2457,6 +2458,8 @@ function Canvas({
       const blockId = String(event.active.id);
       const location = findBlockLocation(blockId);
       if (!location) return;
+      const measuredWidth = event.active.rect.current.initial?.width;
+      setActiveBlockOverlayWidth(typeof measuredWidth === 'number' ? measuredWidth : null);
       setActiveBlockId(blockId);
       setDraggingPayload({
         sectionId: location.sectionId,
@@ -2510,6 +2513,7 @@ function Canvas({
       }
 
       setActiveBlockId(null);
+      setActiveBlockOverlayWidth(null);
       setDraggingPayload(null);
     },
     [findBlockLocation, onMoveBlock, resolveDropTarget],
@@ -2517,6 +2521,7 @@ function Canvas({
 
   const onBlockDragCancel = useCallback(() => {
     setActiveBlockId(null);
+    setActiveBlockOverlayWidth(null);
     setDraggingPayload(null);
   }, []);
 
@@ -2633,7 +2638,7 @@ function Canvas({
         </div>
         <DragOverlay>
           {activeBlock ? (
-            <div style={{ width: 320, pointerEvents: 'none' }}>
+            <div style={{ width: activeBlockOverlayWidth ?? 320, pointerEvents: 'none' }}>
               <BlockPreview
                 block={activeBlock}
                 fontFamily={doc.settings.fontFamily}
