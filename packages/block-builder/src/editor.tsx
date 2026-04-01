@@ -1733,6 +1733,31 @@ function ColumnCard({
       snapTarget.index === index,
     );
 
+  const sourceIndex =
+    draggingPayload &&
+    draggingPayload.sectionId === section.id &&
+    draggingPayload.columnId === column.id
+      ? column.blocks.findIndex((block) => block.id === draggingPayload.blockId)
+      : -1;
+
+  const setCandidateSnapTarget = (index: number, hovering: boolean) => {
+    if (!hovering) {
+      onSetSnapTarget(null);
+      return;
+    }
+
+    const isNoOpTarget =
+      sourceIndex !== -1 &&
+      (index === sourceIndex || index === sourceIndex + 1);
+
+    if (isNoOpTarget) {
+      onSetSnapTarget(null);
+      return;
+    }
+
+    onSetSnapTarget({ sectionId: section.id, columnId: column.id, index });
+  };
+
   const snapPreview = draggingBlock ? (
     <div
       style={{
@@ -1761,9 +1786,7 @@ function ColumnCard({
             isDragging={isDragging}
             onDropType={(type) => onAddBlock(section.id, column.id, type, i)}
             onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, i)}
-            onMoveHoverChange={(hovering) =>
-              onSetSnapTarget(hovering ? { sectionId: section.id, columnId: column.id, index: i } : null)
-            }
+            onMoveHoverChange={(hovering) => setCandidateSnapTarget(i, hovering)}
           />
           <BlockPreview
             block={block}
@@ -1799,13 +1822,7 @@ function ColumnCard({
         isDragging={isDragging}
         onDropType={(type) => onAddBlock(section.id, column.id, type, column.blocks.length)}
         onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, column.blocks.length)}
-        onMoveHoverChange={(hovering) =>
-          onSetSnapTarget(
-            hovering
-              ? { sectionId: section.id, columnId: column.id, index: column.blocks.length }
-              : null,
-          )
-        }
+        onMoveHoverChange={(hovering) => setCandidateSnapTarget(column.blocks.length, hovering)}
       />
       {isSnapTarget(column.blocks.length) && snapPreview}
     </div>
