@@ -2,6 +2,24 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -1162,14 +1180,12 @@ function BlockPreview({
   block,
   fontFamily,
   isSelected,
-  onDragStart,
   onClick,
   dimmed = false,
 }: {
   block: EmailBlock;
   fontFamily: string;
   isSelected: boolean;
-  onDragStart?: (e: React.DragEvent) => void;
   onClick: (e: React.MouseEvent) => void;
   dimmed?: boolean;
 }) {
@@ -1177,7 +1193,7 @@ function BlockPreview({
   const ringColor = isSelected ? C.blockSelected : hover ? `${C.accent}66` : 'transparent';
   const wrapStyle: React.CSSProperties = {
     position: 'relative',
-    cursor: onDragStart ? 'grab' : 'pointer',
+    cursor: 'grab',
     boxShadow: `inset 0 0 0 2px ${ringColor}`,
     borderRadius: 2,
     background: isSelected ? `${C.blockSelected}08` : hover ? C.blockHover : 'transparent',
@@ -1199,9 +1215,6 @@ function BlockPreview({
 
   return (
     <div
-      draggable={Boolean(onDragStart)}
-      data-drag-kind={onDragStart ? 'block' : undefined}
-      onDragStart={onDragStart}
       style={wrapStyle}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
@@ -1272,6 +1285,57 @@ function BlockPreview({
       {block.type === 'html' && (
         <div dangerouslySetInnerHTML={{ __html: block.content }} />
       )}
+    </div>
+  );
+}
+
+function SortableBlockItem({
+  block,
+  sectionId,
+  columnId,
+  fontFamily,
+  isSelected,
+  isDimmed,
+  onSelect,
+}: {
+  block: EmailBlock;
+  sectionId: string;
+  columnId: string;
+  fontFamily: string;
+  isSelected: boolean;
+  isDimmed: boolean;
+  onSelect: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: block.id,
+    data: {
+      kind: 'block',
+      sectionId,
+      columnId,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.35 : 1,
+      }}
+      {...attributes}
+      {...listeners}
+    >
+      <BlockPreview
+        block={block}
+        fontFamily={fontFamily}
+        isSelected={isSelected}
+        dimmed={isDimmed && !isDragging}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+      />
     </div>
   );
 }
@@ -1701,152 +1765,88 @@ function ColumnCard({
   section,
   selection,
   fontFamily,
-  snapTarget,
-  draggingBlock,
   draggingPayload,
-  onBlockDragStart,
   onSelectBlock,
   onAddBlock,
-  onMoveBlock,
-  onSetSnapTarget,
-  isDragging = false,
 }: {
   column: EmailColumn;
   section: EmailSection;
   selection: Selection;
   fontFamily: string;
-  snapTarget: BlockSnapTarget | null;
-  draggingBlock: EmailBlock | null;
   draggingPayload: BlockDragPayload | null;
-  onBlockDragStart: (payload: BlockDragPayload, block: EmailBlock) => void;
   onSelectBlock: (sel: Selection) => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
-  onMoveBlock: (payload: BlockDragPayload, targetSectionId: string, targetColumnId: string, atIndex: number) => void;
-  onSetSnapTarget: (target: BlockSnapTarget | null) => void;
-  isDragging?: boolean;
 }) {
-  const blockRefs = useRef<Array<HTMLDivElement | null>>([]);
-
-  const isSnapTarget = (index: number) =>
-    Boolean(
-      snapTarget &&
-      snapTarget.sectionId === section.id &&
-      snapTarget.columnId === column.id &&
-      snapTarget.index === index,
-    );
-
-  const activeSnapIndex =
-    snapTarget &&
-    snapTarget.sectionId === section.id &&
-    snapTarget.columnId === column.id
-      ? snapTarget.index
-      : null;
-
-  const sourceIndex =
-    draggingPayload &&
-    draggingPayload.sectionId === section.id &&
-    draggingPayload.columnId === column.id
-      ? column.blocks.findIndex((block) => block.id === draggingPayload.blockId)
-      : -1;
-
-  const setCandidateSnapTarget = (index: number, hovering: boolean) => {
-    if (!hovering) {
-      onSetSnapTarget(null);
-      return;
-    }
-
-    const isNoOpTarget =
-      sourceIndex !== -1 &&
-      (index === sourceIndex || index === sourceIndex + 1);
-
-    if (isNoOpTarget) {
-      onSetSnapTarget(null);
-      return;
-    }
-
-    onSetSnapTarget({ sectionId: section.id, columnId: column.id, index });
-  };
-
-  const getOverlayTop = () => {
-    if (activeSnapIndex === null) return 0;
-    if (activeSnapIndex <= 0) return 0;
-
-    const previousBlock = blockRefs.current[activeSnapIndex - 1];
-    if (previousBlock) {
-      return previousBlock.offsetTop + previousBlock.offsetHeight;
-    }
-
-    return 0;
-  };
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column:${section.id}:${column.id}`,
+    data: {
+      kind: 'column',
+      sectionId: section.id,
+      columnId: column.id,
+    },
+  });
 
   return (
-    <div style={{ flex: `0 0 ${column.width}%`, maxWidth: `${column.width}%`, padding: '0 8px', boxSizing: 'border-box', position: 'relative' }}>
-      {column.blocks.map((block, i) => (
-        <React.Fragment key={block.id}>
-          <DropZone
-            isDragging={isDragging}
-            onDropType={(type) => onAddBlock(section.id, column.id, type, i)}
-            onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, i)}
-            onMoveHoverChange={(hovering) => setCandidateSnapTarget(i, hovering)}
+    <div
+      ref={setNodeRef}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(BLOCK_DRAG_TYPE)) return;
+        e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const type = e.dataTransfer.getData(BLOCK_DRAG_TYPE) as EmailBlockType;
+        if (!type) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onAddBlock(section.id, column.id, type, column.blocks.length);
+      }}
+      style={{
+        flex: `0 0 ${column.width}%`,
+        maxWidth: `${column.width}%`,
+        padding: '0 8px',
+        boxSizing: 'border-box',
+        position: 'relative',
+        minHeight: 28,
+        borderRadius: 6,
+        background: isOver ? `${C.accent}12` : 'transparent',
+      }}
+    >
+      <SortableContext items={column.blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+        {column.blocks.map((block) => (
+          <SortableBlockItem
+            key={block.id}
+            block={block}
+            sectionId={section.id}
+            columnId={column.id}
+            fontFamily={fontFamily}
+            isSelected={selection?.type === 'block' && selection.blockId === block.id}
+            isDimmed={
+              Boolean(
+                draggingPayload &&
+                draggingPayload.sectionId === section.id &&
+                draggingPayload.columnId === column.id &&
+                draggingPayload.blockId === block.id,
+              )
+            }
+            onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
           />
-          <div ref={(el) => { blockRefs.current[i] = el; }}>
-            <BlockPreview
-              block={block}
-              fontFamily={fontFamily}
-              isSelected={selection?.type === 'block' && selection.blockId === block.id}
-              dimmed={
-                Boolean(
-                  draggingPayload &&
-                  draggingPayload.sectionId === section.id &&
-                  draggingPayload.columnId === column.id &&
-                  draggingPayload.blockId === block.id,
-                )
-              }
-              onDragStart={(e) => {
-                e.stopPropagation();
-                const payload = { sectionId: section.id, columnId: column.id, blockId: block.id };
-                onBlockDragStart(payload, block);
-                e.dataTransfer.setData(
-                  BLOCK_INSTANCE_DRAG_TYPE,
-                  JSON.stringify(payload),
-                );
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id });
-              }}
-            />
-          </div>
-        </React.Fragment>
-      ))}
-      <DropZone
-        isEmpty={column.blocks.length === 0}
-        isDragging={isDragging}
-        onDropType={(type) => onAddBlock(section.id, column.id, type, column.blocks.length)}
-        onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, column.blocks.length)}
-        onMoveHoverChange={(hovering) => setCandidateSnapTarget(column.blocks.length, hovering)}
-      />
-      {activeSnapIndex !== null && draggingBlock && (
+        ))}
+      </SortableContext>
+      {column.blocks.length === 0 && (
         <div
           style={{
-            position: 'absolute',
-            left: 8,
-            right: 8,
-            top: getOverlayTop(),
-            borderRadius: 3,
-            boxShadow: `0 0 0 2px ${C.accent}`,
-            background: `${C.accent}08`,
-            pointerEvents: 'none',
-            zIndex: 30,
+            height: 40,
+            border: `2px dashed ${isOver ? C.accent : '#d4d4d8'}`,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: isOver ? C.accent : '#a1a1aa',
+            fontSize: 12,
+            fontWeight: 600,
           }}
         >
-          <BlockPreview
-            block={draggingBlock}
-            fontFamily={fontFamily}
-            isSelected={false}
-            onClick={() => {}}
-          />
+          Drag block here
         </div>
       )}
     </div>
@@ -1860,10 +1860,7 @@ function SectionCard({
   selection,
   contentWidth,
   fontFamily,
-  snapTarget,
-  draggingBlock,
   draggingPayload,
-  onBlockDragStart,
   onSelectBlock,
   onSelectSection,
   onMoveUp,
@@ -1871,9 +1868,6 @@ function SectionCard({
   onDuplicate,
   onDelete,
   onAddBlock,
-  onMoveBlock,
-  onSetSnapTarget,
-  isDragging = false,
 }: {
   section: EmailSection;
   index: number;
@@ -1881,10 +1875,7 @@ function SectionCard({
   selection: Selection;
   contentWidth: number;
   fontFamily: string;
-  snapTarget: BlockSnapTarget | null;
-  draggingBlock: EmailBlock | null;
   draggingPayload: BlockDragPayload | null;
-  onBlockDragStart: (payload: BlockDragPayload, block: EmailBlock) => void;
   onSelectBlock: (sel: Selection) => void;
   onSelectSection: (sectionId: string) => void;
   onMoveUp: () => void;
@@ -1892,9 +1883,6 @@ function SectionCard({
   onDuplicate: () => void;
   onDelete: () => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
-  onMoveBlock: (payload: BlockDragPayload, targetSectionId: string, targetColumnId: string, atIndex: number) => void;
-  onSetSnapTarget: (target: BlockSnapTarget | null) => void;
-  isDragging?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const isSectionSelected = selection?.type === 'section' && selection.sectionId === section.id;
@@ -1952,15 +1940,9 @@ function SectionCard({
             section={section}
             selection={selection}
             fontFamily={fontFamily}
-            snapTarget={snapTarget}
-            draggingBlock={draggingBlock}
             draggingPayload={draggingPayload}
-            onBlockDragStart={onBlockDragStart}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
-            onMoveBlock={onMoveBlock}
-            onSetSnapTarget={onSetSnapTarget}
-            isDragging={isDragging}
           />
         ))}
       </div>
@@ -2412,15 +2394,134 @@ function Canvas({
   const canvasWidth: React.CSSProperties['width'] = isMobilePreview ? 375 : '100%';
 
   const [isDragging, setIsDragging] = useState(false);
-  const [dragKind, setDragKind] = useState<'block' | 'row' | 'section' | null>(null);
-  const [snapTarget, setSnapTarget] = useState<BlockSnapTarget | null>(null);
+  const [dragKind, setDragKind] = useState<'row' | 'section' | null>(null);
   const [draggingPayload, setDraggingPayload] = useState<BlockDragPayload | null>(null);
-  const [draggingBlock, setDraggingBlock] = useState<EmailBlock | null>(null);
-  const isBlockDragging = isDragging && dragKind === 'block';
   const isRowDragging = isDragging && (dragKind === 'row' || dragKind === 'section');
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const findBlockLocation = useCallback(
+    (blockId: string) => {
+      for (const section of doc.sections) {
+        for (const column of section.columns) {
+          const index = column.blocks.findIndex((block) => block.id === blockId);
+          if (index !== -1) {
+            return {
+              sectionId: section.id,
+              columnId: column.id,
+              index,
+            };
+          }
+        }
+      }
+      return null;
+    },
+    [doc.sections],
+  );
+
+  const activeBlock = activeBlockId
+    ? doc.sections
+        .flatMap((section) => section.columns)
+        .flatMap((column) => column.blocks)
+        .find((block) => block.id === activeBlockId) ?? null
+    : null;
+
+  const resolveDropTarget = useCallback(
+    (over: DragEndEvent['over'] | DragOverEvent['over']) => {
+      if (!over) return null;
+      const overData = over.data.current as
+        | { kind?: 'block'; sectionId?: string; columnId?: string }
+        | { kind?: 'column'; sectionId?: string; columnId?: string }
+        | undefined;
+
+      if (overData?.kind === 'column' && overData.sectionId && overData.columnId) {
+        const section = doc.sections.find((item) => item.id === overData.sectionId);
+        const column = section?.columns.find((item) => item.id === overData.columnId);
+        if (!column) return null;
+        return {
+          sectionId: overData.sectionId,
+          columnId: overData.columnId,
+          index: column.blocks.length,
+        };
+      }
+
+      const blockLocation = findBlockLocation(String(over.id));
+      if (!blockLocation) return null;
+      return blockLocation;
+    },
+    [doc.sections, findBlockLocation],
+  );
+
+  const onBlockDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const blockId = String(event.active.id);
+      const location = findBlockLocation(blockId);
+      if (!location) return;
+      setActiveBlockId(blockId);
+      setDraggingPayload({
+        sectionId: location.sectionId,
+        columnId: location.columnId,
+        blockId,
+      });
+    },
+    [findBlockLocation],
+  );
+
+  const onBlockDragOver = useCallback(
+    (event: DragOverEvent) => {
+      if (!event.over) return;
+      const activeId = String(event.active.id);
+      const source = findBlockLocation(activeId);
+      const target = resolveDropTarget(event.over);
+      if (!source || !target) return;
+
+      const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
+      if (isSameColumn) return;
+
+      onMoveBlock(
+        { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
+        target.sectionId,
+        target.columnId,
+        target.index,
+      );
+    },
+    [findBlockLocation, onMoveBlock, resolveDropTarget],
+  );
+
+  const onBlockDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const activeId = String(event.active.id);
+      const source = findBlockLocation(activeId);
+      const target = resolveDropTarget(event.over);
+
+      if (source && target) {
+        const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
+        let targetIndex = target.index;
+        if (isSameColumn && source.index < target.index) {
+          targetIndex = target.index + 1;
+        }
+
+        onMoveBlock(
+          { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
+          target.sectionId,
+          target.columnId,
+          targetIndex,
+        );
+      }
+
+      setActiveBlockId(null);
+      setDraggingPayload(null);
+    },
+    [findBlockLocation, onMoveBlock, resolveDropTarget],
+  );
+
+  const onBlockDragCancel = useCallback(() => {
+    setActiveBlockId(null);
+    setDraggingPayload(null);
+  }, []);
 
   useEffect(() => {
-    const getDragKind = (e: DragEvent): 'block' | 'row' | 'section' | null => {
+    const getDragKind = (e: DragEvent): 'row' | 'section' | null => {
       const targetElement = e.target instanceof Element
         ? e.target
         : e.target instanceof Node
@@ -2428,33 +2529,24 @@ function Canvas({
           : null;
       const target = targetElement?.closest('[data-drag-kind]') ?? null;
       const attrKind = target?.getAttribute('data-drag-kind');
-      if (attrKind === 'block' || attrKind === 'row' || attrKind === 'section') {
+      if (attrKind === 'row' || attrKind === 'section') {
         return attrKind;
       }
 
       if (e.dataTransfer?.types.includes(SECTION_DRAG_TYPE)) return 'section';
       if (e.dataTransfer?.types.includes(ROW_DRAG_TYPE)) return 'row';
-      if (
-        e.dataTransfer?.types.includes(BLOCK_DRAG_TYPE) ||
-        e.dataTransfer?.types.includes(BLOCK_INSTANCE_DRAG_TYPE)
-      ) {
-        return 'block';
-      }
-
       return null;
     };
 
     const onStart = (e: DragEvent) => {
       const kind = getDragKind(e);
-      setDragKind(kind ?? 'block');
+      if (!kind) return;
+      setDragKind(kind);
       setIsDragging(true);
     };
     const onEnd = () => {
       setIsDragging(false);
       setDragKind(null);
-      setSnapTarget(null);
-      setDraggingPayload(null);
-      setDraggingBlock(null);
     };
     window.addEventListener('dragstart', onStart, true);
     window.addEventListener('dragend', onEnd, true);
@@ -2471,18 +2563,26 @@ function Canvas({
       style={{ flex: 1, overflowY: 'auto', background: C.canvasBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24 }}
       onClick={onClearSelection}
     >
-      <div
-        style={{
-          width: canvasWidth,
-          maxWidth: isMobilePreview ? 375 : '100%',
-          minHeight: '100%',
-          background: '#fff',
-          boxShadow: '0 4px 24px rgba(0,0,0,.12)',
-          borderRadius: 4,
-          overflow: 'hidden',
-          transition: 'all .25s ease',
-        }}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={onBlockDragStart}
+        onDragOver={onBlockDragOver}
+        onDragEnd={onBlockDragEnd}
+        onDragCancel={onBlockDragCancel}
       >
+        <div
+          style={{
+            width: canvasWidth,
+            maxWidth: isMobilePreview ? 375 : '100%',
+            minHeight: '100%',
+            background: '#fff',
+            boxShadow: '0 4px 24px rgba(0,0,0,.12)',
+            borderRadius: 4,
+            overflow: 'hidden',
+            transition: 'all .25s ease',
+          }}
+        >
         {doc.sections.length === 0 && (
           <RowDropZone empty onDropRow={(widths) => onAddRowAt(0, widths)} onDropSection={() => {}} />
         )}
@@ -2503,13 +2603,7 @@ function Canvas({
               selection={selection}
               contentWidth={rowContentWidth}
               fontFamily={doc.settings.fontFamily}
-              snapTarget={snapTarget}
-              draggingBlock={draggingBlock}
               draggingPayload={draggingPayload}
-              onBlockDragStart={(payload, block) => {
-                setDraggingPayload(payload);
-                setDraggingBlock(block);
-              }}
               onSelectBlock={onSelectBlock}
               onSelectSection={onSelectSection}
               onMoveUp={() => onMoveSection(section.id, -1)}
@@ -2517,12 +2611,6 @@ function Canvas({
               onDuplicate={() => onDuplicateSection(section.id)}
               onDelete={() => onDeleteSection(section.id)}
               onAddBlock={onAddBlock}
-              onMoveBlock={onMoveBlock}
-              onSetSnapTarget={(target) => {
-                if (!isBlockDragging) return;
-                setSnapTarget(target);
-              }}
-              isDragging={isBlockDragging}
             />
             {index < doc.sections.length - 1 && (
               <RowDropZone
@@ -2542,7 +2630,20 @@ function Canvas({
             onDropSection={(sectionId) => onMoveSectionToIndex(sectionId, doc.sections.length)}
           />
         )}
-      </div>
+        </div>
+        <DragOverlay>
+          {activeBlock ? (
+            <div style={{ width: 320, pointerEvents: 'none' }}>
+              <BlockPreview
+                block={activeBlock}
+                fontFamily={doc.settings.fontFamily}
+                isSelected={false}
+                onClick={() => {}}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
