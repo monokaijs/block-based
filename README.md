@@ -1,0 +1,19 @@
+# Block Based
+
+A monorepo for the `@block-based/block-builder` package — a React-based email block editor and renderer.
+
+## Packages
+
+- **`packages/block-builder`** — Core library: types, document model, block normalizers, HTML renderer, and the `EmailBlockEditor` React component.
+
+## Apps
+
+- **`apps/example`** — Interactive dev playground for the block builder.
+- **`apps/landing`** — Landing page for the project.
+
+## Getting started
+
+```bash
+pnpm install
+pnpm dev
+```
