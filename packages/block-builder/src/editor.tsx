@@ -1725,6 +1725,9 @@ function ColumnCard({
   onSetSnapTarget: (target: BlockSnapTarget | null) => void;
   isDragging?: boolean;
 }) {
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const blockRefs = useRef<Array<HTMLDivElement | null>>([]);
+
   const isSnapTarget = (index: number) =>
     Boolean(
       snapTarget &&
@@ -1732,6 +1735,13 @@ function ColumnCard({
       snapTarget.columnId === column.id &&
       snapTarget.index === index,
     );
+
+  const activeSnapIndex =
+    snapTarget &&
+    snapTarget.sectionId === section.id &&
+    snapTarget.columnId === column.id
+      ? snapTarget.index
+      : null;
 
   const sourceIndex =
     draggingPayload &&
@@ -1758,63 +1768,51 @@ function ColumnCard({
     onSetSnapTarget({ sectionId: section.id, columnId: column.id, index });
   };
 
-  const snapPreview = draggingBlock ? (
-    <div
-      style={{
-        margin: '2px 0',
-        borderRadius: 3,
-        boxShadow: `0 0 0 2px ${C.accent}`,
-        background: `${C.accent}08`,
-        pointerEvents: 'none',
-      }}
-    >
-      <BlockPreview
-        block={draggingBlock}
-        fontFamily={fontFamily}
-        isSelected={false}
-        onClick={() => {}}
-      />
-    </div>
-  ) : null;
+  const getOverlayTop = () => {
+    if (activeSnapIndex === null) return 0;
+    if (activeSnapIndex <= 0) return 0;
+
+    const previousBlock = blockRefs.current[activeSnapIndex - 1];
+    if (previousBlock) {
+      return previousBlock.offsetTop + previousBlock.offsetHeight;
+    }
+
+    return 0;
+  };
 
   return (
-    <div style={{ flex: `0 0 ${column.width}%`, maxWidth: `${column.width}%`, padding: '0 8px', boxSizing: 'border-box', position: 'relative' }}>
+    <div ref={columnRef} style={{ flex: `0 0 ${column.width}%`, maxWidth: `${column.width}%`, padding: '0 8px', boxSizing: 'border-box', position: 'relative' }}>
       {column.blocks.map((block, i) => (
         <React.Fragment key={block.id}>
-          {isSnapTarget(i) && snapPreview}
           <DropZone
             isDragging={isDragging}
             onDropType={(type) => onAddBlock(section.id, column.id, type, i)}
             onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, i)}
             onMoveHoverChange={(hovering) => setCandidateSnapTarget(i, hovering)}
           />
-          <BlockPreview
-            block={block}
-            fontFamily={fontFamily}
-            isSelected={selection?.type === 'block' && selection.blockId === block.id}
-            dimmed={
-              Boolean(
-                draggingPayload &&
-                draggingPayload.sectionId === section.id &&
-                draggingPayload.columnId === column.id &&
-                draggingPayload.blockId === block.id,
-              )
-            }
-            onDragStart={(e) => {
-              e.stopPropagation();
-              const payload = { sectionId: section.id, columnId: column.id, blockId: block.id };
-              onBlockDragStart(payload, block);
-              e.dataTransfer.setData(
-                BLOCK_INSTANCE_DRAG_TYPE,
-                JSON.stringify(payload),
-              );
-              e.dataTransfer.effectAllowed = 'move';
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id });
-            }}
-          />
+          {!(draggingPayload && draggingPayload.sectionId === section.id && draggingPayload.columnId === column.id && draggingPayload.blockId === block.id) && (
+            <div ref={(el) => { blockRefs.current[i] = el; }}>
+              <BlockPreview
+                block={block}
+                fontFamily={fontFamily}
+                isSelected={selection?.type === 'block' && selection.blockId === block.id}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  const payload = { sectionId: section.id, columnId: column.id, blockId: block.id };
+                  onBlockDragStart(payload, block);
+                  e.dataTransfer.setData(
+                    BLOCK_INSTANCE_DRAG_TYPE,
+                    JSON.stringify(payload),
+                  );
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id });
+                }}
+              />
+            </div>
+          )}
         </React.Fragment>
       ))}
       <DropZone
@@ -1824,7 +1822,28 @@ function ColumnCard({
         onDropBlock={(payload) => onMoveBlock(payload, section.id, column.id, column.blocks.length)}
         onMoveHoverChange={(hovering) => setCandidateSnapTarget(column.blocks.length, hovering)}
       />
-      {isSnapTarget(column.blocks.length) && snapPreview}
+      {activeSnapIndex !== null && draggingBlock && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 8,
+            right: 8,
+            top: getOverlayTop(),
+            borderRadius: 3,
+            boxShadow: `0 0 0 2px ${C.accent}`,
+            background: `${C.accent}08`,
+            pointerEvents: 'none',
+            zIndex: 30,
+          }}
+        >
+          <BlockPreview
+            block={draggingBlock}
+            fontFamily={fontFamily}
+            isSelected={false}
+            onClick={() => {}}
+          />
+        </div>
+      )}
     </div>
   );
 }
