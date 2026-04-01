@@ -1768,6 +1768,7 @@ function ColumnCard({
   selection,
   fontFamily,
   draggingPayload,
+  paletteDropTarget,
   onSelectBlock,
   onAddBlock,
 }: {
@@ -1776,6 +1777,7 @@ function ColumnCard({
   selection: Selection;
   fontFamily: string;
   draggingPayload: BlockDragPayload | null;
+  paletteDropTarget: { sectionId: string; columnId: string; index: number } | null;
   onSelectBlock: (sel: Selection) => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
 }) {
@@ -1787,6 +1789,22 @@ function ColumnCard({
       columnId: column.id,
     },
   });
+
+  const isTargetColumn = paletteDropTarget?.sectionId === section.id && paletteDropTarget?.columnId === column.id;
+  const placeholderIndex = isTargetColumn ? paletteDropTarget!.index : -1;
+
+  const placeholder = (
+    <div
+      key="__palette-placeholder__"
+      style={{
+        height: 4,
+        borderRadius: 2,
+        background: C.accent,
+        margin: '4px 0',
+        transition: 'all .15s ease',
+      }}
+    />
+  );
 
   return (
     <div
@@ -1814,25 +1832,28 @@ function ColumnCard({
       }}
     >
       <SortableContext items={column.blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-        {column.blocks.map((block) => (
-          <SortableBlockItem
-            key={block.id}
-            block={block}
-            sectionId={section.id}
-            columnId={column.id}
-            fontFamily={fontFamily}
-            isSelected={selection?.type === 'block' && selection.blockId === block.id}
-            isDimmed={
-              Boolean(
-                draggingPayload &&
-                draggingPayload.sectionId === section.id &&
-                draggingPayload.columnId === column.id &&
-                draggingPayload.blockId === block.id,
-              )
-            }
-            onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
-          />
+        {column.blocks.map((block, blockIndex) => (
+          <React.Fragment key={block.id}>
+            {placeholderIndex === blockIndex && placeholder}
+            <SortableBlockItem
+              block={block}
+              sectionId={section.id}
+              columnId={column.id}
+              fontFamily={fontFamily}
+              isSelected={selection?.type === 'block' && selection.blockId === block.id}
+              isDimmed={
+                Boolean(
+                  draggingPayload &&
+                  draggingPayload.sectionId === section.id &&
+                  draggingPayload.columnId === column.id &&
+                  draggingPayload.blockId === block.id,
+                )
+              }
+              onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
+            />
+          </React.Fragment>
         ))}
+        {placeholderIndex >= column.blocks.length && placeholder}
       </SortableContext>
       {column.blocks.length === 0 && (
         <div
@@ -1863,6 +1884,7 @@ function SectionCard({
   contentWidth,
   fontFamily,
   draggingPayload,
+  paletteDropTarget,
   onSelectBlock,
   onSelectSection,
   onMoveUp,
@@ -1878,6 +1900,7 @@ function SectionCard({
   contentWidth: number;
   fontFamily: string;
   draggingPayload: BlockDragPayload | null;
+  paletteDropTarget: { sectionId: string; columnId: string; index: number } | null;
   onSelectBlock: (sel: Selection) => void;
   onSelectSection: (sectionId: string) => void;
   onMoveUp: () => void;
@@ -1943,6 +1966,7 @@ function SectionCard({
             selection={selection}
             fontFamily={fontFamily}
             draggingPayload={draggingPayload}
+            paletteDropTarget={paletteDropTarget}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
           />
@@ -2433,6 +2457,7 @@ function Canvas({
   previewMode,
   draggingPayload,
   isRowDragging,
+  paletteDropTarget,
   onSelectBlock,
   onSelectSection,
   onMoveSection,
@@ -2448,6 +2473,7 @@ function Canvas({
   previewMode: 'desktop' | 'mobile';
   draggingPayload: BlockDragPayload | null;
   isRowDragging: boolean;
+  paletteDropTarget: { sectionId: string; columnId: string; index: number } | null;
   onSelectBlock: (sel: Selection) => void;
   onSelectSection: (sId: string) => void;
   onMoveSection: (sId: string, dir: -1 | 1) => void;
@@ -2500,6 +2526,7 @@ function Canvas({
               contentWidth={rowContentWidth}
               fontFamily={doc.settings.fontFamily}
               draggingPayload={draggingPayload}
+              paletteDropTarget={paletteDropTarget}
               onSelectBlock={onSelectBlock}
               onSelectSection={onSelectSection}
               onMoveUp={() => onMoveSection(section.id, -1)}
@@ -2550,6 +2577,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const [activeBlockOverlayWidth, setActiveBlockOverlayWidth] = useState<number | null>(null);
   const [activePaletteBlock, setActivePaletteBlock] = useState<EmailBlock | null>(null);
   const [activePaletteRow, setActivePaletteRow] = useState<number[] | null>(null);
+  const [paletteDropTarget, setPaletteDropTarget] = useState<{ sectionId: string; columnId: string; index: number } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const update = useCallback(
@@ -2848,8 +2876,14 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
       if (!event.over) return;
       const data = event.active.data.current as Record<string, unknown> | undefined;
       const kind = data?.kind as string | undefined;
-      // For palette items, don't do cross-column moves mid-drag
-      if (kind === 'palette-block' || kind === 'palette-row') return;
+
+      // Track palette drop target for placeholder rendering
+      if (kind === 'palette-block') {
+        const target = resolveDropTarget(event.over);
+        setPaletteDropTarget(target);
+        return;
+      }
+      if (kind === 'palette-row') return;
 
       const activeId = String(event.active.id);
       const source = findBlockLocation(activeId);
@@ -2875,12 +2909,13 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
       const kind = data?.kind as string | undefined;
 
       if (kind === 'palette-block' && activePaletteBlock) {
-        const target = resolveDropTarget(event.over);
+        const target = paletteDropTarget ?? resolveDropTarget(event.over);
         if (target) {
           addBlockToColumn(target.sectionId, target.columnId, activePaletteBlock.type, target.index);
         }
         setActivePaletteBlock(null);
         setActiveBlockOverlayWidth(null);
+        setPaletteDropTarget(null);
         return;
       }
 
@@ -2888,6 +2923,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
         // For now, palette rows add to the end
         // TODO: Could detect a row-drop-zone target
         setActivePaletteRow(null);
+        setPaletteDropTarget(null);
         return;
       }
 
@@ -2924,6 +2960,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
     setDraggingPayload(null);
     setActivePaletteBlock(null);
     setActivePaletteRow(null);
+    setPaletteDropTarget(null);
   }, []);
 
   // ── Native HTML5 drag detection for row/section drag (RowDropZones still use HTML5) ──
@@ -3001,6 +3038,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           previewMode={previewMode}
           draggingPayload={draggingPayload}
           isRowDragging={isRowDragging}
+          paletteDropTarget={paletteDropTarget}
           onSelectBlock={setSelection}
           onSelectSection={(sId) => setSelection({ type: 'section', sectionId: sId })}
           onMoveSection={moveSection}
