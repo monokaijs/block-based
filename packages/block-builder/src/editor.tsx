@@ -1164,12 +1164,14 @@ function BlockPreview({
   isSelected,
   onDragStart,
   onClick,
+  dimmed = false,
 }: {
   block: EmailBlock;
   fontFamily: string;
   isSelected: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   onClick: (e: React.MouseEvent) => void;
+  dimmed?: boolean;
 }) {
   const [hover, setHover] = useState(false);
   const ringColor = isSelected ? C.blockSelected : hover ? `${C.accent}66` : 'transparent';
@@ -1190,6 +1192,10 @@ function BlockPreview({
     opacity: Math.max(0, Math.min(100, block.opacity ?? 100)) / 100,
     transition: 'box-shadow .1s, background .1s',
   };
+
+  if (dimmed) {
+    wrapStyle.opacity = 0.28;
+  }
 
   return (
     <div
@@ -1472,23 +1478,24 @@ function DropZone({
   };
 
   if (isEmpty) {
+    const showMoveIndicator = over && dropMode !== 'move';
     return (
       <div
         onDragOver={onZoneDragOver}
         onDragLeave={onZoneDragLeave}
         onDrop={onZoneDrop}
         style={{
-          height: over ? 34 : 40,
+          height: showMoveIndicator ? 34 : 40,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '2px 0',
           borderRadius: 6,
-          border: over ? `2px dashed ${C.accent}` : `2px dashed #d4d4d8`,
-          background: over
+          border: showMoveIndicator ? `2px dashed ${C.accent}` : `2px dashed #d4d4d8`,
+          background: showMoveIndicator
             ? `repeating-linear-gradient(135deg, ${C.accent}12 0 10px, ${C.accent}22 10px 20px)`
             : 'transparent',
-          color: over ? C.accent : '#a1a1aa',
+          color: showMoveIndicator ? C.accent : '#a1a1aa',
           fontSize: 12,
           fontWeight: 600,
           transition: 'height .12s, border-color .1s, background .1s, color .1s',
@@ -1496,7 +1503,7 @@ function DropZone({
           boxSizing: 'border-box',
         }}
       >
-        {over ? <span style={{ pointerEvents: 'none' }}>{dropMode === 'move' ? 'Move block here' : 'Drop block here'}</span> : <span style={{ pointerEvents: 'none' }}>Drag a block here</span>}
+        {showMoveIndicator ? <span style={{ pointerEvents: 'none' }}>Drop block here</span> : <span style={{ pointerEvents: 'none' }}>Drag a block here</span>}
       </div>
     );
   }
@@ -1525,7 +1532,7 @@ function DropZone({
         }}
       />
       {/* Visual indicator — only visible when hovering */}
-      {over && (
+      {over && dropMode !== 'move' && (
         <div
           style={{
             position: 'absolute',
@@ -1553,7 +1560,7 @@ function DropZone({
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
           }}>
-            {dropMode === 'move' ? 'Move here' : 'Place here'}
+            Place here
           </span>
         </div>
       )}
@@ -1669,6 +1676,9 @@ function ColumnCard({
   selection,
   fontFamily,
   snapTarget,
+  draggingBlock,
+  draggingPayload,
+  onBlockDragStart,
   onSelectBlock,
   onAddBlock,
   onMoveBlock,
@@ -1680,6 +1690,9 @@ function ColumnCard({
   selection: Selection;
   fontFamily: string;
   snapTarget: BlockSnapTarget | null;
+  draggingBlock: EmailBlock | null;
+  draggingPayload: BlockDragPayload | null;
+  onBlockDragStart: (payload: BlockDragPayload, block: EmailBlock) => void;
   onSelectBlock: (sel: Selection) => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
   onMoveBlock: (payload: BlockDragPayload, targetSectionId: string, targetColumnId: string, atIndex: number) => void;
@@ -1694,32 +1707,30 @@ function ColumnCard({
       snapTarget.index === index,
     );
 
-  const snapPlaceholder = (
+  const snapPreview = draggingBlock ? (
     <div
       style={{
-        height: 30,
-        margin: '3px 0',
-        borderRadius: 6,
-        border: `2px dashed ${C.accent}`,
-        background: `${C.accent}12`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: C.accent,
-        fontSize: 11,
-        fontWeight: 600,
+        margin: '2px 0',
+        borderRadius: 3,
+        boxShadow: `0 0 0 2px ${C.accent}`,
+        background: `${C.accent}08`,
         pointerEvents: 'none',
       }}
     >
-      Snap target
+      <BlockPreview
+        block={draggingBlock}
+        fontFamily={fontFamily}
+        isSelected={false}
+        onClick={() => {}}
+      />
     </div>
-  );
+  ) : null;
 
   return (
     <div style={{ flex: `0 0 ${column.width}%`, maxWidth: `${column.width}%`, padding: '0 8px', boxSizing: 'border-box', position: 'relative' }}>
       {column.blocks.map((block, i) => (
         <React.Fragment key={block.id}>
-          {isSnapTarget(i) && snapPlaceholder}
+          {isSnapTarget(i) && snapPreview}
           <DropZone
             isDragging={isDragging}
             onDropType={(type) => onAddBlock(section.id, column.id, type, i)}
@@ -1732,11 +1743,21 @@ function ColumnCard({
             block={block}
             fontFamily={fontFamily}
             isSelected={selection?.type === 'block' && selection.blockId === block.id}
+            dimmed={
+              Boolean(
+                draggingPayload &&
+                draggingPayload.sectionId === section.id &&
+                draggingPayload.columnId === column.id &&
+                draggingPayload.blockId === block.id,
+              )
+            }
             onDragStart={(e) => {
               e.stopPropagation();
+              const payload = { sectionId: section.id, columnId: column.id, blockId: block.id };
+              onBlockDragStart(payload, block);
               e.dataTransfer.setData(
                 BLOCK_INSTANCE_DRAG_TYPE,
-                JSON.stringify({ sectionId: section.id, columnId: column.id, blockId: block.id }),
+                JSON.stringify(payload),
               );
               e.dataTransfer.effectAllowed = 'move';
             }}
@@ -1760,7 +1781,7 @@ function ColumnCard({
           )
         }
       />
-      {isSnapTarget(column.blocks.length) && snapPlaceholder}
+      {isSnapTarget(column.blocks.length) && snapPreview}
     </div>
   );
 }
@@ -1773,6 +1794,9 @@ function SectionCard({
   contentWidth,
   fontFamily,
   snapTarget,
+  draggingBlock,
+  draggingPayload,
+  onBlockDragStart,
   onSelectBlock,
   onSelectSection,
   onMoveUp,
@@ -1791,6 +1815,9 @@ function SectionCard({
   contentWidth: number;
   fontFamily: string;
   snapTarget: BlockSnapTarget | null;
+  draggingBlock: EmailBlock | null;
+  draggingPayload: BlockDragPayload | null;
+  onBlockDragStart: (payload: BlockDragPayload, block: EmailBlock) => void;
   onSelectBlock: (sel: Selection) => void;
   onSelectSection: (sectionId: string) => void;
   onMoveUp: () => void;
@@ -1859,6 +1886,9 @@ function SectionCard({
             selection={selection}
             fontFamily={fontFamily}
             snapTarget={snapTarget}
+            draggingBlock={draggingBlock}
+            draggingPayload={draggingPayload}
+            onBlockDragStart={onBlockDragStart}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
             onMoveBlock={onMoveBlock}
@@ -2317,6 +2347,8 @@ function Canvas({
   const [isDragging, setIsDragging] = useState(false);
   const [dragKind, setDragKind] = useState<'block' | 'row' | 'section' | null>(null);
   const [snapTarget, setSnapTarget] = useState<BlockSnapTarget | null>(null);
+  const [draggingPayload, setDraggingPayload] = useState<BlockDragPayload | null>(null);
+  const [draggingBlock, setDraggingBlock] = useState<EmailBlock | null>(null);
   const isBlockDragging = isDragging && dragKind === 'block';
   const isRowDragging = isDragging && (dragKind === 'row' || dragKind === 'section');
 
@@ -2354,6 +2386,8 @@ function Canvas({
       setIsDragging(false);
       setDragKind(null);
       setSnapTarget(null);
+      setDraggingPayload(null);
+      setDraggingBlock(null);
     };
     window.addEventListener('dragstart', onStart, true);
     window.addEventListener('dragend', onEnd, true);
@@ -2403,6 +2437,12 @@ function Canvas({
               contentWidth={rowContentWidth}
               fontFamily={doc.settings.fontFamily}
               snapTarget={snapTarget}
+              draggingBlock={draggingBlock}
+              draggingPayload={draggingPayload}
+              onBlockDragStart={(payload, block) => {
+                setDraggingPayload(payload);
+                setDraggingBlock(block);
+              }}
               onSelectBlock={onSelectBlock}
               onSelectSection={onSelectSection}
               onMoveUp={() => onMoveSection(section.id, -1)}
