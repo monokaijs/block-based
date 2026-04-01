@@ -139,9 +139,13 @@ export type EmailDocumentSettings = {
   bodyTextColor: string;
   fontFamily: string;
   fontWeight: number;
+  fontSize: number;
   preheaderText: string;
   linkColor: string;
   linkUnderline: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
 };
 
 export type EmailDocument = {

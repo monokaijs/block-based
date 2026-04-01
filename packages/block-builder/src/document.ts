@@ -17,9 +17,13 @@ export function createEmptyDocument(): EmailDocument {
       bodyTextColor: '#1f2937',
       fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
       fontWeight: 400,
+      fontSize: 16,
       preheaderText: '',
       linkColor: '#2563eb',
       linkUnderline: true,
+      primaryColor: '#2563eb',
+      secondaryColor: '#7c3aed',
+      accentColor: '#f59e0b',
     },
     sections: [createSectionTemplate('hero')],
   };
@@ -123,6 +127,13 @@ export function normalizeDocument(
         typeof settings.linkUnderline === 'boolean'
           ? settings.linkUnderline
           : fallback.settings.linkUnderline,
+      fontSize:
+        Number.isFinite(Number(settings.fontSize))
+          ? Number(settings.fontSize)
+          : fallback.settings.fontSize,
+      primaryColor: settings.primaryColor || fallback.settings.primaryColor,
+      secondaryColor: settings.secondaryColor || fallback.settings.secondaryColor,
+      accentColor: settings.accentColor || fallback.settings.accentColor,
     },
     sections,
   };

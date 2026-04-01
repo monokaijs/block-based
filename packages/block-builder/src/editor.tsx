@@ -32,13 +32,18 @@ import {
   AlignRight,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Code2,
   Copy,
+  Eye,
+  EyeOff,
   Heading1,
   Image,
   Laptop,
+  Layers,
   Link,
+  ListTree,
   Menu as MenuIcon,
   MessageSquare,
   MinusSquare,
@@ -49,7 +54,9 @@ import {
   Rows4,
   SeparatorHorizontal,
   Smartphone,
+  Tablet,
   Trash2,
+  Type as TypeIcon,
   type LucideProps,
 } from 'lucide-react';
 import type {
@@ -93,6 +100,9 @@ type Selection =
   | { type: 'block'; sectionId: string; columnId: string; blockId: string }
   | { type: 'section'; sectionId: string }
   | null;
+
+type SidebarTab = 'blocks' | 'sections' | 'prebuilt' | 'tree' | 'settings';
+type ViewMode = 'desktop' | 'tablet' | 'mobile';
 
 export interface EmailBlockEditorProps {
   value?: EmailDocument;
@@ -1773,6 +1783,9 @@ function ColumnCard({
   paletteDropTarget,
   onSelectBlock,
   onAddBlock,
+  showBlockDelete = false,
+  selectedBlockId,
+  onDeleteBlock,
 }: {
   column: EmailColumn;
   section: EmailSection;
@@ -1782,6 +1795,9 @@ function ColumnCard({
   paletteDropTarget: { sectionId: string; columnId: string; index: number } | null;
   onSelectBlock: (sel: Selection) => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
+  showBlockDelete?: boolean;
+  selectedBlockId?: string;
+  onDeleteBlock?: (sId: string, cId: string, bId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column:${section.id}:${column.id}`,
@@ -1834,27 +1850,35 @@ function ColumnCard({
       }}
     >
       <SortableContext items={column.blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-        {column.blocks.map((block, blockIndex) => (
-          <React.Fragment key={block.id}>
-            {placeholderIndex === blockIndex && placeholder}
-            <SortableBlockItem
-              block={block}
-              sectionId={section.id}
-              columnId={column.id}
-              fontFamily={fontFamily}
-              isSelected={selection?.type === 'block' && selection.blockId === block.id}
-              isDimmed={
-                Boolean(
-                  draggingPayload &&
-                  draggingPayload.sectionId === section.id &&
-                  draggingPayload.columnId === column.id &&
-                  draggingPayload.blockId === block.id,
-                )
-              }
-              onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
-            />
-          </React.Fragment>
-        ))}
+        {column.blocks.map((block, blockIndex) => {
+          const isBlockSelected = selection?.type === 'block' && selection.blockId === block.id;
+          return (
+            <React.Fragment key={block.id}>
+              {placeholderIndex === blockIndex && placeholder}
+              <div style={{ position: 'relative' }}>
+                <SortableBlockItem
+                  block={block}
+                  sectionId={section.id}
+                  columnId={column.id}
+                  fontFamily={fontFamily}
+                  isSelected={isBlockSelected}
+                  isDimmed={
+                    Boolean(
+                      draggingPayload &&
+                      draggingPayload.sectionId === section.id &&
+                      draggingPayload.columnId === column.id &&
+                      draggingPayload.blockId === block.id,
+                    )
+                  }
+                  onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
+                />
+                {showBlockDelete && isBlockSelected && selectedBlockId === block.id && onDeleteBlock && (
+                  <FloatingDeleteButton onClick={() => onDeleteBlock(section.id, column.id, block.id)} />
+                )}
+              </div>
+            </React.Fragment>
+          );
+        })}
         {placeholderIndex >= column.blocks.length && placeholder}
       </SortableContext>
       {column.blocks.length === 0 && (
@@ -1894,6 +1918,10 @@ function SectionCard({
   onDuplicate,
   onDelete,
   onAddBlock,
+  previewEnabled = false,
+  showBlockDelete = false,
+  selectedBlockId,
+  onDeleteBlock,
 }: {
   section: EmailSection;
   index: number;
@@ -1910,6 +1938,10 @@ function SectionCard({
   onDuplicate: () => void;
   onDelete: () => void;
   onAddBlock: (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => void;
+  previewEnabled?: boolean;
+  showBlockDelete?: boolean;
+  selectedBlockId?: string;
+  onDeleteBlock?: (sId: string, cId: string, bId: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const isSectionSelected = selection?.type === 'section' && selection.sectionId === section.id;
@@ -1937,7 +1969,7 @@ function SectionCard({
       onClick={(e) => { e.stopPropagation(); onSelectSection(section.id); }}
     >
       {/* Section toolbar */}
-      {(hovered || isSectionSelected) && (
+      {!previewEnabled && (hovered || isSectionSelected) && (
         <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 20, display: 'flex', gap: 4 }}>
           {index > 0 && <ControlBtn icon={<ChevronUp size={13} />} title="Move up" onClick={(e) => { e.stopPropagation(); onMoveUp(); }} />}
           {index < total - 1 && <ControlBtn icon={<ChevronDown size={13} />} title="Move down" onClick={(e) => { e.stopPropagation(); onMoveDown(); }} />}
@@ -1971,6 +2003,9 @@ function SectionCard({
             paletteDropTarget={paletteDropTarget}
             onSelectBlock={onSelectBlock}
             onAddBlock={onAddBlock}
+            showBlockDelete={showBlockDelete}
+            selectedBlockId={selectedBlockId}
+            onDeleteBlock={onDeleteBlock}
           />
         ))}
       </div>
@@ -2012,6 +2047,385 @@ const BLOCK_LAYOUTS: Array<{ id: string; columns: number[] }> = [
   { id: 'triple-focus', columns: [20, 30, 50] },
   { id: 'split-focus', columns: [40, 20, 40] },
 ];
+
+// ─── Prebuilt section templates ───────────────────────────────────────────────
+
+type PrebuiltTemplate = {
+  id: string;
+  label: string;
+  desc: string;
+  Icon: React.FC<LucideProps>;
+  create: () => EmailSection;
+};
+
+const PREBUILT_TEMPLATES: PrebuiltTemplate[] = [
+  {
+    id: 'hero-banner',
+    label: 'Hero Banner',
+    desc: 'Heading + paragraph + CTA button',
+    Icon: Rows4,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#ffffff',
+        paddingTop: 40,
+        paddingBottom: 40,
+        paddingLeft: 24,
+        paddingRight: 24,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'heading', content: 'Welcome to Our Newsletter', fontSize: 36, fontWeight: 700, align: 'center', color: '#111827' },
+              { type: 'paragraph', content: 'Stay updated with the latest news, tips, and exclusive offers delivered straight to your inbox.', fontSize: 16, align: 'center', color: '#6b7280' },
+              { type: 'button', label: 'Get Started', url: '#', align: 'center', backgroundColor: '#2563eb', textColor: '#ffffff', borderRadius: 8 },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'image-text',
+    label: 'Image + Text',
+    desc: 'Image left, content right',
+    Icon: MinusSquare,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#ffffff',
+        paddingTop: 24,
+        paddingBottom: 24,
+        columns: [
+          {
+            width: 40,
+            blocks: [
+              { type: 'image', src: '', alt: 'Feature image', width: 280, align: 'center' },
+            ],
+          },
+          {
+            width: 60,
+            blocks: [
+              { type: 'heading', content: 'Feature Highlight', fontSize: 24, fontWeight: 600 },
+              { type: 'paragraph', content: 'Describe your feature or product benefit here. Keep it concise and compelling.' },
+              { type: 'button', label: 'Learn More', url: '#', backgroundColor: '#2563eb', textColor: '#ffffff', borderRadius: 6 },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'feature-grid',
+    label: 'Feature Grid',
+    desc: '3-column feature layout',
+    Icon: MinusSquare,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#f9fafb',
+        paddingTop: 32,
+        paddingBottom: 32,
+        paddingLeft: 16,
+        paddingRight: 16,
+        columns: [
+          {
+            width: 100 / 3,
+            blocks: [
+              { type: 'heading', content: 'Feature One', fontSize: 20, fontWeight: 600, align: 'center' },
+              { type: 'paragraph', content: 'Brief description of your first feature or benefit.', fontSize: 14, align: 'center', color: '#6b7280' },
+            ],
+          },
+          {
+            width: 100 / 3,
+            blocks: [
+              { type: 'heading', content: 'Feature Two', fontSize: 20, fontWeight: 600, align: 'center' },
+              { type: 'paragraph', content: 'Brief description of your second feature or benefit.', fontSize: 14, align: 'center', color: '#6b7280' },
+            ],
+          },
+          {
+            width: 100 / 3,
+            blocks: [
+              { type: 'heading', content: 'Feature Three', fontSize: 20, fontWeight: 600, align: 'center' },
+              { type: 'paragraph', content: 'Brief description of your third feature or benefit.', fontSize: 14, align: 'center', color: '#6b7280' },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'cta-banner',
+    label: 'CTA Banner',
+    desc: 'Call to action on accent background',
+    Icon: Link,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#2563eb',
+        paddingTop: 40,
+        paddingBottom: 40,
+        paddingLeft: 24,
+        paddingRight: 24,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'heading', content: 'Ready to get started?', fontSize: 28, fontWeight: 700, align: 'center', color: '#ffffff' },
+              { type: 'paragraph', content: 'Join thousands of happy customers today.', fontSize: 16, align: 'center', color: '#dbeafe' },
+              { type: 'button', label: 'Sign Up Now', url: '#', align: 'center', backgroundColor: '#ffffff', textColor: '#2563eb', borderRadius: 8 },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'nav-header',
+    label: 'Navigation',
+    desc: 'Logo area + menu links',
+    Icon: MenuIcon,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#ffffff',
+        paddingTop: 16,
+        paddingBottom: 16,
+        paddingLeft: 24,
+        paddingRight: 24,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'menu', items: [{ label: 'Home', url: '#' }, { label: 'About', url: '#' }, { label: 'Blog', url: '#' }, { label: 'Contact', url: '#' }], align: 'center', fontSize: 14, color: '#374151', itemSpacing: 24 },
+              { type: 'divider', color: '#e5e7eb', thickness: 1 },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'testimonial',
+    label: 'Testimonial',
+    desc: 'Quote with attribution',
+    Icon: MessageSquare,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#f9fafb',
+        paddingTop: 32,
+        paddingBottom: 32,
+        paddingLeft: 40,
+        paddingRight: 40,
+        borderRadius: 8,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'paragraph', content: '"This product has completely transformed the way we work. I can\'t imagine going back to our old tools."', fontSize: 18, align: 'center', color: '#374151' },
+              { type: 'paragraph', content: '— Jane Smith, CEO at Company', fontSize: 14, align: 'center', color: '#9ca3af' },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'footer',
+    label: 'Footer',
+    desc: 'Links + copyright',
+    Icon: Code2,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#1f2937',
+        paddingTop: 32,
+        paddingBottom: 32,
+        paddingLeft: 24,
+        paddingRight: 24,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'menu', items: [{ label: 'Privacy', url: '#' }, { label: 'Terms', url: '#' }, { label: 'Unsubscribe', url: '#' }], align: 'center', fontSize: 13, color: '#9ca3af', itemSpacing: 20 },
+              { type: 'paragraph', content: '© 2026 Your Company. All rights reserved.\n123 Main St, City, Country', fontSize: 12, align: 'center', color: '#6b7280' },
+            ],
+          },
+        ],
+      }),
+  },
+  {
+    id: 'image-banner',
+    label: 'Image Banner',
+    desc: 'Full-width image section',
+    Icon: Image,
+    create: () =>
+      normalizeSection({
+        backgroundColor: '#ffffff',
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        columns: [
+          {
+            width: 100,
+            blocks: [
+              { type: 'image', src: '', alt: 'Banner image', width: 640, align: 'center' },
+            ],
+          },
+        ],
+      }),
+  },
+];
+
+// ─── TreeView component ───────────────────────────────────────────────────────
+
+function TreeNode({
+  label,
+  icon,
+  depth,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  depth: number;
+  active: boolean;
+  onClick: () => void;
+  children?: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = Boolean(children);
+
+  return (
+    <div>
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 8px',
+          paddingLeft: 8 + depth * 16,
+          cursor: 'pointer',
+          borderRadius: 4,
+          background: active ? `${C.accent}12` : 'transparent',
+          color: active ? C.accent : '#3f3f46',
+          fontSize: 12,
+          fontWeight: active ? 600 : 400,
+          userSelect: 'none',
+        }}
+      >
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 16,
+              height: 16,
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              color: 'inherit',
+              flexShrink: 0,
+            }}
+          >
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+        ) : (
+          <span style={{ width: 16, flexShrink: 0 }} />
+        )}
+        <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{icon}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      </div>
+      {hasChildren && expanded && children}
+    </div>
+  );
+}
+
+function TreeView({
+  doc,
+  selection,
+  onSelectSection,
+  onSelectBlock,
+}: {
+  doc: EmailDocument;
+  selection: Selection;
+  onSelectSection: (sectionId: string) => void;
+  onSelectBlock: (sectionId: string, columnId: string, blockId: string) => void;
+}) {
+  const blockLabel: Record<EmailBlockType, string> = {
+    heading: 'Heading',
+    paragraph: 'Paragraph',
+    button: 'Button',
+    image: 'Image',
+    divider: 'Divider',
+    spacer: 'Spacer',
+    menu: 'Menu',
+    html: 'HTML',
+  };
+
+  const blockIcon: Record<EmailBlockType, React.ReactNode> = {
+    heading: <Heading1 size={12} />,
+    paragraph: <MessageSquare size={12} />,
+    button: <MousePointerClick size={12} />,
+    image: <Image size={12} />,
+    divider: <SeparatorHorizontal size={12} />,
+    spacer: <MoveVertical size={12} />,
+    menu: <MenuIcon size={12} />,
+    html: <Code2 size={12} />,
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {doc.sections.length === 0 && (
+        <div style={{ padding: 16, color: '#a1a1aa', fontSize: 12, textAlign: 'center' }}>
+          No rows yet
+        </div>
+      )}
+      {doc.sections.map((section, sIndex) => (
+        <TreeNode
+          key={section.id}
+          label={`Row ${sIndex + 1}`}
+          icon={<Rows4 size={12} />}
+          depth={0}
+          active={selection?.type === 'section' && selection.sectionId === section.id}
+          onClick={() => onSelectSection(section.id)}
+        >
+          {section.columns.map((column, cIndex) => (
+            <TreeNode
+              key={column.id}
+              label={`Column ${cIndex + 1} (${Math.round(column.width)}%)`}
+              icon={<MinusSquare size={12} />}
+              depth={1}
+              active={false}
+              onClick={() => onSelectSection(section.id)}
+            >
+              {column.blocks.map((block) => {
+                const preview = block.type === 'heading'
+                  ? (block as any).content?.slice(0, 20) || 'Heading'
+                  : block.type === 'paragraph'
+                  ? (block as any).content?.slice(0, 20) || 'Paragraph'
+                  : block.type === 'button'
+                  ? (block as any).label?.slice(0, 20) || 'Button'
+                  : blockLabel[block.type];
+
+                return (
+                  <TreeNode
+                    key={block.id}
+                    label={preview}
+                    icon={blockIcon[block.type]}
+                    depth={2}
+                    active={selection?.type === 'block' && selection.blockId === block.id}
+                    onClick={() => onSelectBlock(section.id, column.id, block.id)}
+                  />
+                );
+              })}
+            </TreeNode>
+          ))}
+        </TreeNode>
+      ))}
+    </div>
+  );
+}
 
 function DraggablePaletteBlock({
   type,
@@ -2210,26 +2624,32 @@ function Sidebar({
   onAddSection,
   onAddLayout,
   onUpdateSettings,
+  onAddPrebuilt,
   selection,
   onUpdateBlock,
   onDeleteBlock,
   onUpdateSection,
   onDeleteSection,
   onClearSelection,
+  onSelectSection,
+  onSelectBlock,
 }: {
-  activeTab: 'blocks' | 'sections' | 'settings';
-  onTabChange: (t: 'blocks' | 'sections' | 'settings') => void;
+  activeTab: SidebarTab;
+  onTabChange: (t: SidebarTab) => void;
   doc: EmailDocument;
   onAddBlock: (type: EmailBlockType) => void;
   onAddSection: (type: 'blank' | 'hero' | 'two-column' | 'cta') => void;
   onAddLayout: (widths: number[]) => void;
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
+  onAddPrebuilt: (section: EmailSection) => void;
   selection: Selection;
   onUpdateBlock: (sId: string, cId: string, bId: string, patch: Partial<EmailBlock>) => void;
   onDeleteBlock: (sId: string, cId: string, bId: string) => void;
   onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
   onDeleteSection: (sId: string) => void;
   onClearSelection: () => void;
+  onSelectSection: (sectionId: string) => void;
+  onSelectBlock: (sectionId: string, columnId: string, blockId: string) => void;
 }) {
   const shellStyle: React.CSSProperties = {
     width: 380,
@@ -2273,10 +2693,12 @@ function Sidebar({
     padding: '14px',
   };
 
-  const navItems: Array<{ id: 'blocks' | 'sections' | 'settings'; label: string; Icon: React.FC<LucideProps> }> = [
+  const navItems: Array<{ id: SidebarTab; label: string; Icon: React.FC<LucideProps> }> = [
     { id: 'blocks', label: 'Content', Icon: Rows4 },
     { id: 'sections', label: 'Rows', Icon: MinusSquare },
-    { id: 'settings', label: 'Body', Icon: Image },
+    { id: 'prebuilt', label: 'Blocks', Icon: Layers },
+    { id: 'tree', label: 'Tree', Icon: ListTree },
+    { id: 'settings', label: 'Body', Icon: TypeIcon },
   ];
 
   const renderShell = (title: string, body: React.ReactNode, showBack = false, backLabel = 'Back', hideRail = false) => (
@@ -2372,18 +2794,159 @@ function Sidebar({
   }
 
   if (activeTab === 'settings') {
+    const fontFamilyOptions = [
+      { value: "'Inter', 'Helvetica Neue', Arial, sans-serif", label: 'Inter' },
+      { value: "'Georgia', serif", label: 'Georgia' },
+      { value: "'Courier New', monospace", label: 'Courier New' },
+      { value: "'Arial', 'Helvetica', sans-serif", label: 'Arial' },
+      { value: "'Verdana', sans-serif", label: 'Verdana' },
+      { value: "'Trebuchet MS', sans-serif", label: 'Trebuchet MS' },
+      { value: "'Times New Roman', serif", label: 'Times New Roman' },
+      { value: "'Roboto', 'Helvetica Neue', Arial, sans-serif", label: 'Roboto' },
+    ];
+
+    const fontWeightOptions = [
+      { value: '300', label: 'Light' },
+      { value: '400', label: 'Regular' },
+      { value: '500', label: 'Medium' },
+      { value: '600', label: 'Semi Bold' },
+      { value: '700', label: 'Bold' },
+    ];
+
     return renderShell(
       'Body',
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <Field label="Background Color">
-          <ColorInput value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
-        </Field>
-        <Field label="Content Width (px)">
-          <NumberInput value={doc.settings.contentWidth} min={320} max={1200} onChange={(v) => onUpdateSettings({ contentWidth: v })} />
-        </Field>
-        <Field label="Text Color">
-          <ColorInput value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
-        </Field>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <InspectorSection title="Typography">
+          <Field label="Font Family">
+            <SelectInput value={doc.settings.fontFamily} options={fontFamilyOptions} onChange={(v) => onUpdateSettings({ fontFamily: v })} />
+          </Field>
+          <Field label="Base Font Size">
+            <NumberInput value={doc.settings.fontSize} min={10} max={32} onChange={(v) => onUpdateSettings({ fontSize: v })} />
+          </Field>
+          <Field label="Font Weight">
+            <SelectInput value={String(doc.settings.fontWeight)} options={fontWeightOptions} onChange={(v) => onUpdateSettings({ fontWeight: Number(v) })} />
+          </Field>
+          <Field label="Text Color">
+            <ColorInput value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
+          </Field>
+          <Field label="Link Color">
+            <ColorInput value={doc.settings.linkColor} onChange={(v) => onUpdateSettings({ linkColor: v })} />
+          </Field>
+          <Field label="Underline Links">
+            <button
+              onClick={() => onUpdateSettings({ linkUnderline: !doc.settings.linkUnderline })}
+              style={{
+                padding: '5px 12px',
+                border: `1px solid ${doc.settings.linkUnderline ? C.accent : C.inspectorBorder}`,
+                borderRadius: 6,
+                background: doc.settings.linkUnderline ? `${C.accent}12` : '#fafafa',
+                color: doc.settings.linkUnderline ? C.accent : '#71717a',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              {doc.settings.linkUnderline ? 'Yes' : 'No'}
+            </button>
+          </Field>
+        </InspectorSection>
+
+        <InspectorSection title="Color Palette">
+          <Field label="Primary">
+            <ColorInput value={doc.settings.primaryColor} onChange={(v) => onUpdateSettings({ primaryColor: v })} />
+          </Field>
+          <Field label="Secondary">
+            <ColorInput value={doc.settings.secondaryColor} onChange={(v) => onUpdateSettings({ secondaryColor: v })} />
+          </Field>
+          <Field label="Accent">
+            <ColorInput value={doc.settings.accentColor} onChange={(v) => onUpdateSettings({ accentColor: v })} />
+          </Field>
+        </InspectorSection>
+
+        <InspectorSection title="Layout">
+          <Field label="Background Color">
+            <ColorInput value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
+          </Field>
+          <Field label="Content Background">
+            <ColorInput value={doc.settings.contentBackgroundColor} onChange={(v) => onUpdateSettings({ contentBackgroundColor: v })} />
+          </Field>
+          <Field label="Content Width (px)">
+            <NumberInput value={doc.settings.contentWidth} min={320} max={1200} onChange={(v) => onUpdateSettings({ contentWidth: v })} />
+          </Field>
+          <Field label="Content Align">
+            <AlignButtons value={doc.settings.contentAlign} onChange={(v) => onUpdateSettings({ contentAlign: v })} />
+          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            <Field label="Pad Top">
+              <NumberInput value={doc.settings.contentPaddingTop} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingTop: v })} />
+            </Field>
+            <Field label="Pad Right">
+              <NumberInput value={doc.settings.contentPaddingRight} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingRight: v })} />
+            </Field>
+            <Field label="Pad Bottom">
+              <NumberInput value={doc.settings.contentPaddingBottom} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingBottom: v })} />
+            </Field>
+            <Field label="Pad Left">
+              <NumberInput value={doc.settings.contentPaddingLeft} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingLeft: v })} />
+            </Field>
+          </div>
+        </InspectorSection>
+
+        <InspectorSection title="Meta">
+          <Field label="Preheader Text">
+            <textarea
+              style={{ ...textareaStyle, minHeight: 60 }}
+              value={doc.settings.preheaderText}
+              onChange={(e) => onUpdateSettings({ preheaderText: e.target.value })}
+              placeholder="Preview text shown in inbox..."
+            />
+          </Field>
+        </InspectorSection>
+      </div>,
+    );
+  }
+
+  if (activeTab === 'tree') {
+    return renderShell(
+      'Tree View',
+      <TreeView
+        doc={doc}
+        selection={selection}
+        onSelectSection={onSelectSection}
+        onSelectBlock={onSelectBlock}
+      />,
+    );
+  }
+
+  if (activeTab === 'prebuilt') {
+    return renderShell(
+      'Prebuilt Blocks',
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {PREBUILT_TEMPLATES.map((template) => (
+          <button
+            key={template.id}
+            onClick={() => onAddPrebuilt(template.create())}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '12px 14px',
+              border: `1px solid ${C.sidebarBorder}`,
+              borderRadius: 8,
+              background: '#ffffff',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
+              <template.Icon size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{template.label}</div>
+              <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{template.desc}</div>
+            </div>
+          </button>
+        ))}
       </div>,
     );
   }
@@ -2416,47 +2979,152 @@ function Sidebar({
 // ─── Toolbar ─────────────────────────────────────────────────────────────────
 
 function Toolbar({
-  previewMode,
-  onPreviewMode,
+  previewEnabled,
+  onTogglePreview,
 }: {
-  previewMode: 'desktop' | 'mobile';
-  onPreviewMode: (m: 'desktop' | 'mobile') => void;
+  previewEnabled: boolean;
+  onTogglePreview: () => void;
 }) {
   return (
     <div style={{ height: 44, background: '#fff', borderBottom: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, flexShrink: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: '#18181b', marginRight: 'auto' }}>Block Builder</span>
-      {(['desktop', 'mobile'] as const).map((mode) => (
-        <button
-          key={mode}
-          onClick={() => onPreviewMode(mode)}
-          style={{
-            padding: '5px 12px',
-            border: `1px solid ${previewMode === mode ? C.accent : C.inspectorBorder}`,
-            borderRadius: 6,
-            background: previewMode === mode ? C.accent : 'transparent',
-            color: previewMode === mode ? '#fff' : '#52525b',
-            cursor: 'pointer',
-            fontSize: 12,
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          {mode === 'desktop' ? <Laptop size={14} /> : <Smartphone size={14} />}
-          {mode === 'desktop' ? 'Desktop' : 'Mobile'}
-        </button>
-      ))}
+      <span style={{ fontSize: 13, fontWeight: 600, color: '#18181b', flex: 1 }}>Block Builder</span>
+      <button
+        onClick={onTogglePreview}
+        title={previewEnabled ? 'Exit Preview' : 'Preview Mode'}
+        style={{
+          padding: '5px 12px',
+          border: `1px solid ${previewEnabled ? C.accent : C.inspectorBorder}`,
+          borderRadius: 6,
+          background: previewEnabled ? C.accent : 'transparent',
+          color: previewEnabled ? '#fff' : '#52525b',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {previewEnabled ? <EyeOff size={14} /> : <Eye size={14} />}
+        {previewEnabled ? 'Exit Preview' : 'Preview'}
+      </button>
     </div>
   );
 }
 
 // ─── Canvas ───────────────────────────────────────────────────────────────────
 
+function DeviceToggle({
+  viewMode,
+  onViewMode,
+}: {
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
+}) {
+  const modes: Array<{ mode: ViewMode; Icon: React.FC<LucideProps>; title: string }> = [
+    { mode: 'desktop', Icon: Laptop, title: 'Desktop' },
+    { mode: 'tablet', Icon: Tablet, title: 'Tablet' },
+    { mode: 'mobile', Icon: Smartphone, title: 'Mobile' },
+  ];
+
+  return (
+    <div style={{ display: 'inline-flex', gap: 2, padding: 3, borderRadius: 8, background: '#fff', border: `1px solid ${C.inspectorBorder}`, boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
+      {modes.map(({ mode, Icon, title }) => (
+        <button
+          key={mode}
+          onClick={() => onViewMode(mode)}
+          title={title}
+          style={{
+            width: 32,
+            height: 28,
+            border: 'none',
+            borderRadius: 6,
+            background: viewMode === mode ? C.accent : 'transparent',
+            color: viewMode === mode ? '#fff' : '#71717a',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon size={15} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FloatingDeleteButton({ onClick }: { onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Delete block"
+      style={{
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        zIndex: 30,
+        width: 28,
+        height: 28,
+        border: 'none',
+        borderRadius: 6,
+        background: hover ? C.dangerHover : C.danger,
+        color: '#ffffff',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,.18)',
+        transition: 'background .15s',
+      }}
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function AddRowButton({ position, onClick }: { position: 'top' | 'bottom'; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={position === 'top' ? 'Add row above' : 'Add row below'}
+      style={{
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        ...(position === 'top' ? { top: -14 } : { bottom: -14 }),
+        zIndex: 30,
+        width: 28,
+        height: 28,
+        border: `2px solid ${hover ? C.accentHover : C.accent}`,
+        borderRadius: '50%',
+        background: hover ? C.accent : '#ffffff',
+        color: hover ? '#ffffff' : C.accent,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,.14)',
+        transition: 'all .15s',
+      }}
+    >
+      <Plus size={14} />
+    </button>
+  );
+}
+
 function Canvas({
   doc,
   selection,
-  previewMode,
+  viewMode,
+  onViewMode,
+  previewEnabled,
   draggingPayload,
   isRowDragging,
   paletteDropTarget,
@@ -2465,6 +3133,7 @@ function Canvas({
   onMoveSection,
   onDuplicateSection,
   onDeleteSection,
+  onDeleteBlock,
   onAddBlock,
   onAddRowAt,
   onMoveSectionToIndex,
@@ -2472,7 +3141,9 @@ function Canvas({
 }: {
   doc: EmailDocument;
   selection: Selection;
-  previewMode: 'desktop' | 'mobile';
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
+  previewEnabled: boolean;
   draggingPayload: BlockDragPayload | null;
   isRowDragging: boolean;
   paletteDropTarget: { sectionId: string; columnId: string; index: number } | null;
@@ -2481,36 +3152,44 @@ function Canvas({
   onMoveSection: (sId: string, dir: -1 | 1) => void;
   onDuplicateSection: (sId: string) => void;
   onDeleteSection: (sId: string) => void;
+  onDeleteBlock: (sId: string, cId: string, bId: string) => void;
   onAddBlock: (sId: string, cId: string, type: EmailBlockType, atIndex?: number) => void;
   onAddRowAt: (index: number, widths: number[]) => void;
   onMoveSectionToIndex: (sectionId: string, toIndex: number) => void;
   onClearSelection: () => void;
 }) {
-  const isMobilePreview = previewMode === 'mobile';
-  const rowContentWidth = isMobilePreview ? 375 : doc.settings.contentWidth;
-  const canvasWidth: React.CSSProperties['width'] = isMobilePreview ? 375 : '100%';
+  const isMobilePreview = viewMode === 'mobile';
+  const isTabletPreview = viewMode === 'tablet';
+  const rowContentWidth = isMobilePreview ? 375 : isTabletPreview ? 768 : doc.settings.contentWidth;
+  const canvasWidth: React.CSSProperties['width'] = isMobilePreview ? 375 : isTabletPreview ? 768 : '100%';
 
   return (
     <div
-      style={{ flex: 1, overflowY: 'auto', background: C.canvasBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24 }}
-      onClick={onClearSelection}
+      style={{ flex: 1, overflowY: 'auto', background: C.canvasBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, position: 'relative' }}
+      onClick={previewEnabled ? undefined : onClearSelection}
     >
-        <div
-          style={{
-            width: canvasWidth,
-            maxWidth: isMobilePreview ? 375 : '100%',
-            minHeight: '100%',
-            background: '#fff',
-            boxShadow: '0 4px 24px rgba(0,0,0,.12)',
-            borderRadius: 4,
-            overflow: 'hidden',
-            transition: 'all .25s ease',
-          }}
-        >
-        {doc.sections.length === 0 && (
+      {/* Device toggle at top center */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 40, marginBottom: 16 }}>
+        <DeviceToggle viewMode={viewMode} onViewMode={onViewMode} />
+      </div>
+
+      <div
+        style={{
+          width: canvasWidth,
+          maxWidth: isMobilePreview ? 375 : isTabletPreview ? 768 : '100%',
+          minHeight: '100%',
+          background: '#fff',
+          boxShadow: '0 4px 24px rgba(0,0,0,.12)',
+          borderRadius: 4,
+          overflow: 'hidden',
+          transition: 'all .25s ease',
+          pointerEvents: previewEnabled ? 'none' : 'auto',
+        }}
+      >
+        {!previewEnabled && doc.sections.length === 0 && (
           <RowDropZone empty onDropRow={(widths) => onAddRowAt(0, widths)} onDropSection={() => {}} />
         )}
-        {doc.sections.length > 0 && (
+        {!previewEnabled && doc.sections.length > 0 && (
           <RowDropZone
             position="edge"
             isDragging={isRowDragging}
@@ -2518,36 +3197,53 @@ function Canvas({
             onDropSection={(sectionId) => onMoveSectionToIndex(sectionId, 0)}
           />
         )}
-        {doc.sections.map((section, index) => (
-          <React.Fragment key={section.id}>
-            <SectionCard
-              section={section}
-              index={index}
-              total={doc.sections.length}
-              selection={selection}
-              contentWidth={rowContentWidth}
-              fontFamily={doc.settings.fontFamily}
-              draggingPayload={draggingPayload}
-              paletteDropTarget={paletteDropTarget}
-              onSelectBlock={onSelectBlock}
-              onSelectSection={onSelectSection}
-              onMoveUp={() => onMoveSection(section.id, -1)}
-              onMoveDown={() => onMoveSection(section.id, 1)}
-              onDuplicate={() => onDuplicateSection(section.id)}
-              onDelete={() => onDeleteSection(section.id)}
-              onAddBlock={onAddBlock}
-            />
-            {index < doc.sections.length - 1 && (
-              <RowDropZone
-                position="between"
-                isDragging={isRowDragging}
-                onDropRow={(widths) => onAddRowAt(index + 1, widths)}
-                onDropSection={(sectionId) => onMoveSectionToIndex(sectionId, index + 1)}
-              />
-            )}
-          </React.Fragment>
-        ))}
-        {doc.sections.length > 0 && (
+        {doc.sections.map((section, index) => {
+          const isSectionSelected = !previewEnabled && selection?.type === 'section' && selection.sectionId === section.id;
+
+          return (
+            <React.Fragment key={section.id}>
+              <div style={{ position: 'relative' }}>
+                <SectionCard
+                  section={section}
+                  index={index}
+                  total={doc.sections.length}
+                  selection={previewEnabled ? null : selection}
+                  contentWidth={rowContentWidth}
+                  fontFamily={doc.settings.fontFamily}
+                  draggingPayload={previewEnabled ? null : draggingPayload}
+                  paletteDropTarget={previewEnabled ? null : paletteDropTarget}
+                  onSelectBlock={previewEnabled ? () => {} : onSelectBlock}
+                  onSelectSection={previewEnabled ? () => {} : onSelectSection}
+                  onMoveUp={() => onMoveSection(section.id, -1)}
+                  onMoveDown={() => onMoveSection(section.id, 1)}
+                  onDuplicate={() => onDuplicateSection(section.id)}
+                  onDelete={() => onDeleteSection(section.id)}
+                  onAddBlock={onAddBlock}
+                  previewEnabled={previewEnabled}
+                  showBlockDelete={!previewEnabled && selection?.type === 'block' && selection.sectionId === section.id}
+                  selectedBlockId={selection?.type === 'block' ? selection.blockId : undefined}
+                  onDeleteBlock={onDeleteBlock}
+                />
+                {/* Add row buttons on selected row */}
+                {isSectionSelected && (
+                  <>
+                    <AddRowButton position="top" onClick={() => onAddRowAt(index, [100])} />
+                    <AddRowButton position="bottom" onClick={() => onAddRowAt(index + 1, [100])} />
+                  </>
+                )}
+              </div>
+              {!previewEnabled && index < doc.sections.length - 1 && (
+                <RowDropZone
+                  position="between"
+                  isDragging={isRowDragging}
+                  onDropRow={(widths) => onAddRowAt(index + 1, widths)}
+                  onDropSection={(sectionId) => onMoveSectionToIndex(sectionId, index + 1)}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+        {!previewEnabled && doc.sections.length > 0 && (
           <RowDropZone
             position="edge"
             isDragging={isRowDragging}
@@ -2555,7 +3251,7 @@ function Canvas({
             onDropSection={(sectionId) => onMoveSectionToIndex(sectionId, doc.sections.length)}
           />
         )}
-        </div>
+      </div>
     </div>
   );
 }
@@ -2567,8 +3263,9 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
     value ? normalizeDocument(value) : createEmptyDocument(),
   );
   const [selection, setSelection] = useState<Selection>(null);
-  const [activeTab, setActiveTab] = useState<'blocks' | 'sections' | 'settings'>('blocks');
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('blocks');
+  const [viewMode, setViewMode] = useState<ViewMode>('desktop');
+  const [previewEnabled, setPreviewEnabled] = useState(false);
 
   // ── Drag state (lifted from Canvas) ────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
@@ -2620,6 +3317,14 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const addSectionLayout = useCallback(
     (widths: number[]) => {
       const section = createRowFromWidths(widths);
+      update({ ...doc, sections: [...doc.sections, section] });
+      setSelection({ type: 'section', sectionId: section.id });
+    },
+    [doc, update],
+  );
+
+  const addPrebuiltSection = useCallback(
+    (section: EmailSection) => {
       update({ ...doc, sections: [...doc.sections, section] });
       setSelection({ type: 'section', sectionId: section.id });
     },
@@ -3039,7 +3744,13 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13, position: 'relative' }}>
-      <Toolbar previewMode={previewMode} onPreviewMode={setPreviewMode} />
+      <Toolbar
+        previewEnabled={previewEnabled}
+        onTogglePreview={() => {
+          setPreviewEnabled(!previewEnabled);
+          if (!previewEnabled) setSelection(null);
+        }}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -3049,25 +3760,32 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
         onDragCancel={onDragCancel}
       >
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          doc={doc}
-          onAddBlock={addBlockToSection}
-          onAddSection={addSection}
-          onAddLayout={addSectionLayout}
-          onUpdateSettings={updateSettings}
-          selection={selection}
-          onUpdateBlock={updateBlock}
-          onDeleteBlock={deleteBlock}
-          onUpdateSection={updateSection}
-          onDeleteSection={deleteSection}
-          onClearSelection={() => setSelection(null)}
-        />
+        {!previewEnabled && (
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            doc={doc}
+            onAddBlock={addBlockToSection}
+            onAddSection={addSection}
+            onAddLayout={addSectionLayout}
+            onUpdateSettings={updateSettings}
+            onAddPrebuilt={addPrebuiltSection}
+            selection={selection}
+            onUpdateBlock={updateBlock}
+            onDeleteBlock={deleteBlock}
+            onUpdateSection={updateSection}
+            onDeleteSection={deleteSection}
+            onClearSelection={() => setSelection(null)}
+            onSelectSection={(sId) => setSelection({ type: 'section', sectionId: sId })}
+            onSelectBlock={(sId, cId, bId) => setSelection({ type: 'block', sectionId: sId, columnId: cId, blockId: bId })}
+          />
+        )}
         <Canvas
           doc={doc}
           selection={selection}
-          previewMode={previewMode}
+          viewMode={viewMode}
+          onViewMode={setViewMode}
+          previewEnabled={previewEnabled}
           draggingPayload={draggingPayload}
           isRowDragging={isRowDragging}
           paletteDropTarget={paletteDropTarget}
@@ -3076,6 +3794,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           onMoveSection={moveSection}
           onDuplicateSection={duplicateSection}
           onDeleteSection={deleteSection}
+          onDeleteBlock={deleteBlock}
           onAddBlock={addBlockToColumn}
           onAddRowAt={addRowAt}
           onMoveSectionToIndex={moveSectionToIndex}
