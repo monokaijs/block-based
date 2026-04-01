@@ -15,6 +15,19 @@ export type {
   EmailSection,
   EmailDocumentSettings,
   EmailDocument,
+  ColorPalette,
+  CustomColor,
+  SampleBlock,
+  TemplateDefinition,
+  CustomTab,
+  CustomTabContext,
+  EditorFeatures,
+} from './types';
+
+export {
+  COLOR_PALETTE_KEYS,
+  COLOR_PALETTE_LABELS,
+  DEFAULT_COLOR_PALETTE,
 } from './types';
 
 // Section input types (for consumers building section templates programmatically)

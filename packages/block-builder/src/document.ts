@@ -1,4 +1,5 @@
-import type { EmailDocument } from './types';
+import type { ColorPalette, EmailDocument } from './types';
+import { DEFAULT_COLOR_PALETTE } from './types';
 import { nextId } from './utils';
 import { createSectionTemplate, normalizeSection } from './section';
 
@@ -21,9 +22,8 @@ export function createEmptyDocument(): EmailDocument {
       preheaderText: '',
       linkColor: '#2563eb',
       linkUnderline: true,
-      primaryColor: '#2563eb',
-      secondaryColor: '#7c3aed',
-      accentColor: '#f59e0b',
+      colorPalette: { ...DEFAULT_COLOR_PALETTE },
+      customColors: [],
     },
     sections: [createSectionTemplate('hero')],
   };
@@ -77,6 +77,30 @@ export function isEmailDocument(value: unknown): value is EmailDocument {
   );
 }
 
+function normalizePalette(input: Partial<ColorPalette> | undefined | null): ColorPalette {
+  const d = DEFAULT_COLOR_PALETTE;
+  if (!input) return { ...d };
+  return {
+    background: input.background || d.background,
+    foreground: input.foreground || d.foreground,
+    card: input.card || d.card,
+    cardForeground: input.cardForeground || d.cardForeground,
+    primary: input.primary || d.primary,
+    primaryForeground: input.primaryForeground || d.primaryForeground,
+    secondary: input.secondary || d.secondary,
+    secondaryForeground: input.secondaryForeground || d.secondaryForeground,
+    accent: input.accent || d.accent,
+    accentForeground: input.accentForeground || d.accentForeground,
+    muted: input.muted || d.muted,
+    mutedForeground: input.mutedForeground || d.mutedForeground,
+    destructive: input.destructive || d.destructive,
+    destructiveForeground: input.destructiveForeground || d.destructiveForeground,
+    border: input.border || d.border,
+    input: input.input || d.input,
+    ring: input.ring || d.ring,
+  };
+}
+
 export function normalizeDocument(
   input: Partial<EmailDocument> | undefined | null,
 ): EmailDocument {
@@ -86,6 +110,19 @@ export function normalizeDocument(
     Array.isArray(input?.sections) && input.sections.length > 0
       ? input.sections.map(normalizeSection)
       : fallback.sections;
+
+  // Backwards compatibility: migrate old primaryColor/secondaryColor/accentColor
+  const legacySettings = settings as Record<string, unknown>;
+  const basePalette = settings.colorPalette ?? {};
+  if (legacySettings.primaryColor && !basePalette.primary) {
+    (basePalette as Record<string, unknown>).primary = legacySettings.primaryColor;
+  }
+  if (legacySettings.secondaryColor && !basePalette.secondary) {
+    (basePalette as Record<string, unknown>).secondary = legacySettings.secondaryColor;
+  }
+  if (legacySettings.accentColor && !basePalette.accent) {
+    (basePalette as Record<string, unknown>).accent = legacySettings.accentColor;
+  }
 
   return {
     version: 1,
@@ -131,9 +168,8 @@ export function normalizeDocument(
         Number.isFinite(Number(settings.fontSize))
           ? Number(settings.fontSize)
           : fallback.settings.fontSize,
-      primaryColor: settings.primaryColor || fallback.settings.primaryColor,
-      secondaryColor: settings.secondaryColor || fallback.settings.secondaryColor,
-      accentColor: settings.accentColor || fallback.settings.accentColor,
+      colorPalette: normalizePalette(basePalette as Partial<ColorPalette>),
+      customColors: Array.isArray(settings.customColors) ? settings.customColors : [],
     },
     sections,
   };

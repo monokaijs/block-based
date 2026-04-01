@@ -66,7 +66,14 @@ import type {
   EmailDocument,
   MenuItem,
   EmailSection,
+  ColorPalette,
+  CustomColor,
+  SampleBlock,
+  TemplateDefinition,
+  CustomTab,
+  EditorFeatures,
 } from './types';
+import { COLOR_PALETTE_KEYS, COLOR_PALETTE_LABELS, DEFAULT_COLOR_PALETTE } from './types';
 import { createBlock } from './blocks';
 import { createEmptyDocument, normalizeDocument } from './document';
 import { createSectionTemplate, normalizeSection } from './section';
@@ -101,13 +108,39 @@ type Selection =
   | { type: 'section'; sectionId: string }
   | null;
 
-type SidebarTab = 'blocks' | 'sections' | 'prebuilt' | 'tree' | 'settings';
+type SidebarTab = 'blocks' | 'sections' | 'templates' | 'tree' | 'settings' | string;
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
+
+const DEFAULT_FEATURES: EditorFeatures = {
+  content: true,
+  rows: true,
+  templates: true,
+  treeView: true,
+  bodySettings: true,
+  preview: true,
+  dragDrop: true,
+  customColors: true,
+};
 
 export interface EmailBlockEditorProps {
   value?: EmailDocument;
   onChange?: (doc: EmailDocument) => void;
   height?: string | number;
+
+  /** Override default color palette values. */
+  defaultPalette?: Partial<ColorPalette>;
+
+  /** Extra pre-configured blocks shown in the Content tab. */
+  sampleBlocks?: SampleBlock[];
+
+  /** Extra templates shown in the Templates tab. */
+  templates?: TemplateDefinition[];
+
+  /** User-defined sidebar tabs rendered after built-in tabs. */
+  customTabs?: CustomTab[];
+
+  /** Feature flags to enable/disable capabilities (all default true). */
+  features?: Partial<EditorFeatures>;
 }
 
 // ─── Document update helpers ──────────────────────────────────────────────────
@@ -158,6 +191,25 @@ function findBlock(
 
 function findSection(doc: EmailDocument, sectionId: string): EmailSection | undefined {
   return doc.sections.find((s) => s.id === sectionId);
+}
+
+/** Creates a block with default colors derived from the document palette. */
+function createBlockWithPalette(type: EmailBlockType, palette: ColorPalette): EmailBlock {
+  const base = createBlock(type);
+  switch (type) {
+    case 'heading':
+      return { ...base, color: palette.foreground } as EmailBlock;
+    case 'paragraph':
+      return { ...base, color: palette.mutedForeground } as EmailBlock;
+    case 'button':
+      return { ...base, backgroundColor: palette.primary, textColor: palette.primaryForeground } as EmailBlock;
+    case 'divider':
+      return { ...base, color: palette.border } as EmailBlock;
+    case 'menu':
+      return { ...base, color: palette.foreground } as EmailBlock;
+    default:
+      return base;
+  }
 }
 
 const ROW_LAYOUT_OPTIONS: Array<{ label: string; widths: number[] }> = [
@@ -367,6 +419,175 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
       <input type="color" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: 32, height: 32, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 2, background: 'none' }} />
       <input style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+// ─── Palette-aware color picker ──────────────────────────────────────────────
+
+const PaletteContext = React.createContext<{
+  palette: ColorPalette;
+  customColors: CustomColor[];
+}>({ palette: DEFAULT_COLOR_PALETTE, customColors: [] });
+
+function PaletteColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { palette, customColors } = React.useContext(PaletteContext);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  const paletteGroups: Array<{ label: string; keys: (keyof ColorPalette)[] }> = [
+    { label: 'Base', keys: ['background', 'foreground'] },
+    { label: 'Card', keys: ['card', 'cardForeground'] },
+    { label: 'Primary', keys: ['primary', 'primaryForeground'] },
+    { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] },
+    { label: 'Accent', keys: ['accent', 'accentForeground'] },
+    { label: 'Muted', keys: ['muted', 'mutedForeground'] },
+    { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] },
+    { label: 'Border', keys: ['border', 'input', 'ring'] },
+  ];
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div
+          onClick={() => setOpen(!open)}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            border: `1px solid ${C.inspectorBorder}`,
+            background: value,
+            cursor: 'pointer',
+            flexShrink: 0,
+            position: 'relative',
+          }}
+        />
+        <input
+          style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
+        />
+      </div>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            marginTop: 4,
+            background: '#ffffff',
+            border: `1px solid ${C.inspectorBorder}`,
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,.15)',
+            padding: 8,
+            maxHeight: 320,
+            overflowY: 'auto',
+          }}
+        >
+          {paletteGroups.map(({ label, keys }) => (
+            <div key={label} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
+                {label}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {keys.map((key) => {
+                  const color = palette[key];
+                  const isActive = value.toLowerCase() === color.toLowerCase();
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { onChange(color); setOpen(false); }}
+                      title={`${COLOR_PALETTE_LABELS[key]}: ${color}`}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 4,
+                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.inspectorBorder}`,
+                        background: color,
+                        cursor: 'pointer',
+                        padding: 0,
+                        boxShadow: isActive ? `0 0 0 1px ${C.accent}` : 'none',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {customColors.length > 0 && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
+                Custom
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {customColors.map((cc) => {
+                  const isActive = value.toLowerCase() === cc.value.toLowerCase();
+                  return (
+                    <button
+                      key={cc.id}
+                      onClick={() => { onChange(cc.value); setOpen(false); }}
+                      title={`${cc.label}: ${cc.value}`}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 4,
+                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.inspectorBorder}`,
+                        background: cc.value,
+                        cursor: 'pointer',
+                        padding: 0,
+                        boxShadow: isActive ? `0 0 0 1px ${C.accent}` : 'none',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div style={{ borderTop: `1px solid ${C.inspectorBorder}`, paddingTop: 6, marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input
+              type="color"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none' }}
+            />
+            <input
+              style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setOpen(false); }}
+              placeholder="#000000"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -727,7 +948,7 @@ function BorderSection({
         />
       </Field>
       <Field label="Color">
-        <ColorInput value={value.borderColor ?? '#d1d5db'} onChange={(v) => onChange({ borderColor: v })} />
+        <PaletteColorPicker value={value.borderColor ?? '#d1d5db'} onChange={(v) => onChange({ borderColor: v })} />
       </Field>
       {mode === 'basic' ? (
         <Field label="Width (px)">
@@ -812,7 +1033,7 @@ function HeadingInspector({ block, onUpdate }: { block: Extract<EmailBlock, { ty
             onChange={(v) => onUpdate({ fontWeight: Number(v) })}
           />
         </Field>
-        <Field label="Color"><ColorInput value={block.color ?? '#111827'} onChange={(v) => onUpdate({ color: v })} /></Field>
+        <Field label="Color"><PaletteColorPicker value={block.color ?? '#111827'} onChange={(v) => onUpdate({ color: v })} /></Field>
         <Field label="Align"><AlignButtons value={block.align} onChange={(v) => onUpdate({ align: v })} /></Field>
       </InspectorSection>
       <SpacingSection value={block} onChange={onUpdate} />
@@ -830,7 +1051,7 @@ function ParagraphInspector({ block, onUpdate }: { block: Extract<EmailBlock, { 
           <textarea style={textareaStyle} value={block.content} onChange={(e) => onUpdate({ content: e.target.value })} />
         </Field>
         <Field label="Font Size"><NumberInput value={block.fontSize ?? 16} min={8} max={48} onChange={(v) => onUpdate({ fontSize: v })} /></Field>
-        <Field label="Color"><ColorInput value={block.color ?? '#4b5563'} onChange={(v) => onUpdate({ color: v })} /></Field>
+        <Field label="Color"><PaletteColorPicker value={block.color ?? '#4b5563'} onChange={(v) => onUpdate({ color: v })} /></Field>
         <Field label="Align"><AlignButtons value={block.align} onChange={(v) => onUpdate({ align: v })} /></Field>
       </InspectorSection>
       <SpacingSection value={block} onChange={onUpdate} />
@@ -893,8 +1114,8 @@ function ButtonInspector({ block, onUpdate }: { block: Extract<EmailBlock, { typ
         )}
       </InspectorSection>
       <InspectorSection title="Style">
-        <Field label="Background"><ColorInput value={block.backgroundColor ?? '#881c1c'} onChange={(v) => onUpdate({ backgroundColor: v })} /></Field>
-        <Field label="Text Color"><ColorInput value={block.textColor ?? '#ffffff'} onChange={(v) => onUpdate({ textColor: v })} /></Field>
+        <Field label="Background"><PaletteColorPicker value={block.backgroundColor ?? '#881c1c'} onChange={(v) => onUpdate({ backgroundColor: v })} /></Field>
+        <Field label="Text Color"><PaletteColorPicker value={block.textColor ?? '#ffffff'} onChange={(v) => onUpdate({ textColor: v })} /></Field>
       </InspectorSection>
       <SpacingSection value={block} onChange={onUpdate} />
       <BorderSection value={block} onChange={onUpdate} />
@@ -923,7 +1144,7 @@ function DividerInspector({ block, onUpdate }: { block: Extract<EmailBlock, { ty
   return (
     <>
       <InspectorSection title="Style">
-        <Field label="Color"><ColorInput value={block.color ?? '#e5e7eb'} onChange={(v) => onUpdate({ color: v })} /></Field>
+        <Field label="Color"><PaletteColorPicker value={block.color ?? '#e5e7eb'} onChange={(v) => onUpdate({ color: v })} /></Field>
         <Field label="Thickness (px)"><NumberInput value={block.thickness ?? 1} min={1} max={20} onChange={(v) => onUpdate({ thickness: v })} /></Field>
       </InspectorSection>
       <SpacingSection value={block} onChange={onUpdate} />
@@ -1011,7 +1232,7 @@ function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type:
       </InspectorSection>
       <InspectorSection title="Style">
         <Field label="Align"><AlignButtons value={block.align} onChange={(v) => onUpdate({ align: v })} /></Field>
-        <Field label="Color"><ColorInput value={block.color ?? '#374151'} onChange={(v) => onUpdate({ color: v })} /></Field>
+        <Field label="Color"><PaletteColorPicker value={block.color ?? '#374151'} onChange={(v) => onUpdate({ color: v })} /></Field>
         <Field label="Font Size"><NumberInput value={block.fontSize ?? 14} min={8} max={28} onChange={(v) => onUpdate({ fontSize: v })} /></Field>
         <Field label="Item Spacing"><NumberInput value={block.itemSpacing ?? 14} min={0} max={60} onChange={(v) => onUpdate({ itemSpacing: v })} /></Field>
       </InspectorSection>
@@ -1125,7 +1346,7 @@ function SectionInspectorPanel({
           </div>
         </InspectorSection>
         <InspectorSection title="Style">
-          <Field label="Background"><ColorInput value={section.backgroundColor ?? '#ffffff'} onChange={(v) => onUpdate({ backgroundColor: v })} /></Field>
+          <Field label="Background"><PaletteColorPicker value={section.backgroundColor ?? '#ffffff'} onChange={(v) => onUpdate({ backgroundColor: v })} /></Field>
         </InspectorSection>
         <SpacingSection value={section} onChange={onUpdate} />
         <BorderSection value={section} onChange={onUpdate} />
@@ -2633,6 +2854,10 @@ function Sidebar({
   onClearSelection,
   onSelectSection,
   onSelectBlock,
+  sampleBlocks,
+  userTemplates,
+  customTabs,
+  features,
 }: {
   activeTab: SidebarTab;
   onTabChange: (t: SidebarTab) => void;
@@ -2650,6 +2875,10 @@ function Sidebar({
   onClearSelection: () => void;
   onSelectSection: (sectionId: string) => void;
   onSelectBlock: (sectionId: string, columnId: string, blockId: string) => void;
+  sampleBlocks?: SampleBlock[];
+  userTemplates?: TemplateDefinition[];
+  customTabs?: CustomTab[];
+  features: EditorFeatures;
 }) {
   const shellStyle: React.CSSProperties = {
     width: 380,
@@ -2694,11 +2923,16 @@ function Sidebar({
   };
 
   const navItems: Array<{ id: SidebarTab; label: string; Icon: React.FC<LucideProps> }> = [
-    { id: 'blocks', label: 'Content', Icon: Rows4 },
-    { id: 'sections', label: 'Rows', Icon: MinusSquare },
-    { id: 'prebuilt', label: 'Blocks', Icon: Layers },
-    { id: 'tree', label: 'Tree', Icon: ListTree },
-    { id: 'settings', label: 'Body', Icon: TypeIcon },
+    ...(features.content ? [{ id: 'blocks' as SidebarTab, label: 'Content', Icon: Rows4 }] : []),
+    ...(features.rows ? [{ id: 'sections' as SidebarTab, label: 'Rows', Icon: MinusSquare }] : []),
+    ...(features.templates ? [{ id: 'templates' as SidebarTab, label: 'Templates', Icon: Layers }] : []),
+    ...(features.treeView ? [{ id: 'tree' as SidebarTab, label: 'Tree', Icon: ListTree }] : []),
+    ...(features.bodySettings ? [{ id: 'settings' as SidebarTab, label: 'Body', Icon: TypeIcon }] : []),
+    ...(customTabs ?? []).map((tab) => ({
+      id: tab.id as SidebarTab,
+      label: tab.label,
+      Icon: tab.icon as React.FC<LucideProps>,
+    })),
   ];
 
   const renderShell = (title: string, body: React.ReactNode, showBack = false, backLabel = 'Back', hideRail = false) => (
@@ -2827,10 +3061,10 @@ function Sidebar({
             <SelectInput value={String(doc.settings.fontWeight)} options={fontWeightOptions} onChange={(v) => onUpdateSettings({ fontWeight: Number(v) })} />
           </Field>
           <Field label="Text Color">
-            <ColorInput value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
+            <PaletteColorPicker value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
           </Field>
           <Field label="Link Color">
-            <ColorInput value={doc.settings.linkColor} onChange={(v) => onUpdateSettings({ linkColor: v })} />
+            <PaletteColorPicker value={doc.settings.linkColor} onChange={(v) => onUpdateSettings({ linkColor: v })} />
           </Field>
           <Field label="Underline Links">
             <button
@@ -2852,23 +3086,104 @@ function Sidebar({
         </InspectorSection>
 
         <InspectorSection title="Color Palette">
-          <Field label="Primary">
-            <ColorInput value={doc.settings.primaryColor} onChange={(v) => onUpdateSettings({ primaryColor: v })} />
-          </Field>
-          <Field label="Secondary">
-            <ColorInput value={doc.settings.secondaryColor} onChange={(v) => onUpdateSettings({ secondaryColor: v })} />
-          </Field>
-          <Field label="Accent">
-            <ColorInput value={doc.settings.accentColor} onChange={(v) => onUpdateSettings({ accentColor: v })} />
-          </Field>
+          {(
+            [
+              { label: 'Base', keys: ['background', 'foreground'] as (keyof ColorPalette)[] },
+              { label: 'Card', keys: ['card', 'cardForeground'] as (keyof ColorPalette)[] },
+              { label: 'Primary', keys: ['primary', 'primaryForeground'] as (keyof ColorPalette)[] },
+              { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] as (keyof ColorPalette)[] },
+              { label: 'Accent', keys: ['accent', 'accentForeground'] as (keyof ColorPalette)[] },
+              { label: 'Muted', keys: ['muted', 'mutedForeground'] as (keyof ColorPalette)[] },
+              { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] as (keyof ColorPalette)[] },
+              { label: 'Borders', keys: ['border', 'input', 'ring'] as (keyof ColorPalette)[] },
+            ] as const
+          ).map(({ label, keys }) => (
+            <div key={label} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+              {keys.map((key) => (
+                <Field key={key} label={COLOR_PALETTE_LABELS[key]}>
+                  <ColorInput
+                    value={doc.settings.colorPalette[key]}
+                    onChange={(v) =>
+                      onUpdateSettings({ colorPalette: { ...doc.settings.colorPalette, [key]: v } })
+                    }
+                  />
+                </Field>
+              ))}
+            </div>
+          ))}
+        </InspectorSection>
+
+        <InspectorSection title="Custom Colors">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {doc.settings.customColors.map((cc, idx) => (
+              <div key={cc.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Name</div>
+                  <input
+                    style={{ ...inputStyle, width: '100%' }}
+                    value={cc.label}
+                    onChange={(e) => {
+                      const updated = [...doc.settings.customColors];
+                      updated[idx] = { ...cc, label: e.target.value };
+                      onUpdateSettings({ customColors: updated });
+                    }}
+                    placeholder="Color name"
+                  />
+                </div>
+                <div style={{ width: 80 }}>
+                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Value</div>
+                  <ColorInput
+                    value={cc.value}
+                    onChange={(v) => {
+                      const updated = [...doc.settings.customColors];
+                      updated[idx] = { ...cc, value: v };
+                      onUpdateSettings({ customColors: updated });
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = doc.settings.customColors.filter((_, i) => i !== idx);
+                    onUpdateSettings({ customColors: updated });
+                  }}
+                  title="Remove color"
+                  style={{ width: 28, height: 28, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const newColor: CustomColor = { id: nextId('cc'), label: 'Custom', value: '#6366f1' };
+                onUpdateSettings({ customColors: [...doc.settings.customColors, newColor] });
+              }}
+              style={{
+                padding: '6px 12px',
+                border: `1px dashed ${C.inspectorBorder}`,
+                borderRadius: 6,
+                background: '#fafafa',
+                color: '#52525b',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Plus size={12} /> Add Custom Color
+            </button>
+          </div>
         </InspectorSection>
 
         <InspectorSection title="Layout">
           <Field label="Background Color">
-            <ColorInput value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
+            <PaletteColorPicker value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
           </Field>
           <Field label="Content Background">
-            <ColorInput value={doc.settings.contentBackgroundColor} onChange={(v) => onUpdateSettings({ contentBackgroundColor: v })} />
+            <PaletteColorPicker value={doc.settings.contentBackgroundColor} onChange={(v) => onUpdateSettings({ contentBackgroundColor: v })} />
           </Field>
           <Field label="Content Width (px)">
             <NumberInput value={doc.settings.contentWidth} min={320} max={1200} onChange={(v) => onUpdateSettings({ contentWidth: v })} />
@@ -2918,60 +3233,127 @@ function Sidebar({
     );
   }
 
-  if (activeTab === 'prebuilt') {
+  if (activeTab === 'templates') {
+    const allTemplates = [
+      ...PREBUILT_TEMPLATES.map((t) => ({
+        id: t.id,
+        label: t.label,
+        desc: t.desc,
+        icon: t.Icon,
+        create: t.create as () => EmailSection | EmailSection[],
+      })),
+      ...(userTemplates ?? []),
+    ];
     return renderShell(
-      'Prebuilt Blocks',
+      'Templates',
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {PREBUILT_TEMPLATES.map((template) => (
-          <button
-            key={template.id}
-            onClick={() => onAddPrebuilt(template.create())}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '12px 14px',
-              border: `1px solid ${C.sidebarBorder}`,
-              borderRadius: 8,
-              background: '#ffffff',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
-              <template.Icon size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{template.label}</div>
-              <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{template.desc}</div>
-            </div>
-          </button>
-        ))}
+        {allTemplates.map((template) => {
+          const Icon = template.icon;
+          return (
+            <button
+              key={template.id}
+              onClick={() => {
+                const result = template.create();
+                const sections = Array.isArray(result) ? result : [result];
+                sections.forEach((s) => onAddPrebuilt(s));
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                border: `1px solid ${C.sidebarBorder}`,
+                borderRadius: 8,
+                background: '#ffffff',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
+                {Icon ? <Icon size={18} /> : <Layers size={18} />}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{template.label}</div>
+                {template.desc && <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{template.desc}</div>}
+              </div>
+            </button>
+          );
+        })}
       </div>,
+    );
+  }
+
+  // ── Custom tabs ─────────────────────────────────────────────────────────────
+  const customTab = (customTabs ?? []).find((t) => t.id === activeTab);
+  if (customTab) {
+    return renderShell(
+      customTab.label,
+      <>{customTab.render({ doc, selection, updateSettings: onUpdateSettings })}</>,
     );
   }
 
   return renderShell(
     'Content',
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-      {ROW_PALETTE.map(({ label, Icon, desc, columns }) => (
-        <DraggablePaletteRow
-          key={label}
-          label={label}
-          Icon={Icon}
-          desc={desc}
-          columns={columns}
-        />
-      ))}
-      {BLOCK_PALETTE.map(({ type, label, Icon, desc }) => (
-        <DraggablePaletteBlock
-          key={type}
-          type={type}
-          label={label}
-          Icon={Icon}
-          desc={desc}
-        />
-      ))}
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+        {ROW_PALETTE.map(({ label, Icon, desc, columns }) => (
+          <DraggablePaletteRow
+            key={label}
+            label={label}
+            Icon={Icon}
+            desc={desc}
+            columns={columns}
+          />
+        ))}
+        {BLOCK_PALETTE.map(({ type, label, Icon, desc }) => (
+          <DraggablePaletteBlock
+            key={type}
+            type={type}
+            label={label}
+            Icon={Icon}
+            desc={desc}
+          />
+        ))}
+      </div>
+      {sampleBlocks && sampleBlocks.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Sample Blocks</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {sampleBlocks.map((sb) => {
+              const SbIcon = sb.icon;
+              return (
+                <button
+                  key={sb.id}
+                  onClick={() => {
+                    const block = sb.create();
+                    // Insert via addBlock pathway
+                    onAddBlock(block.type);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 12px',
+                    border: `1px solid ${C.sidebarBorder}`,
+                    borderRadius: 8,
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: 6, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
+                    {SbIcon ? <SbIcon size={14} /> : <Layers size={14} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{sb.label}</div>
+                    {sb.desc && <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{sb.desc}</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>,
   );
 }
@@ -3258,10 +3640,24 @@ function Canvas({
 
 // ─── Main editor component ────────────────────────────────────────────────────
 
-export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBlockEditorProps) {
-  const [doc, setDoc] = useState<EmailDocument>(() =>
-    value ? normalizeDocument(value) : createEmptyDocument(),
-  );
+export function EmailBlockEditor({
+  value,
+  onChange,
+  height = '100%',
+  defaultPalette,
+  sampleBlocks,
+  templates: userTemplates,
+  customTabs,
+  features: featureOverrides,
+}: EmailBlockEditorProps) {
+  const features: EditorFeatures = { ...DEFAULT_FEATURES, ...featureOverrides };
+  const [doc, setDoc] = useState<EmailDocument>(() => {
+    const base = value ? normalizeDocument(value) : createEmptyDocument();
+    if (defaultPalette) {
+      return { ...base, settings: { ...base.settings, colorPalette: { ...base.settings.colorPalette, ...defaultPalette } } };
+    }
+    return base;
+  });
   const [selection, setSelection] = useState<Selection>(null);
   const [activeTab, setActiveTab] = useState<SidebarTab>('blocks');
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
@@ -3418,7 +3814,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
         columnId = section.columns[0].id;
       } else {
         const section = createSectionTemplate('blank');
-        const block = createBlock(type);
+        const block = createBlockWithPalette(type, doc.settings.colorPalette);
         const updated: EmailDocument = {
           ...doc,
           sections: [
@@ -3430,7 +3826,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
         return;
       }
 
-      const block = createBlock(type);
+      const block = createBlockWithPalette(type, doc.settings.colorPalette);
       update(
         mapSection(doc, sectionId, (s) => ({
           ...s,
@@ -3446,7 +3842,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
 
   const addBlockToColumn = useCallback(
     (sectionId: string, columnId: string, type: EmailBlockType, atIndex?: number) => {
-      const block = createBlock(type);
+      const block = createBlockWithPalette(type, doc.settings.colorPalette);
       update(
         mapSection(doc, sectionId, (s) => ({
           ...s,
@@ -3575,7 +3971,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
 
       if (kind === 'palette-block') {
         const blockType = data!.blockType as EmailBlockType;
-        const block = createBlock(blockType);
+        const block = createBlockWithPalette(blockType, doc.settings.colorPalette);
         setActivePaletteBlock(block);
         setActiveBlockOverlayWidth(320);
         return;
@@ -3743,6 +4139,7 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const overlayBlock = activeBlock ?? activePaletteBlock;
 
   return (
+    <PaletteContext.Provider value={{ palette: doc.settings.colorPalette, customColors: doc.settings.customColors }}>
     <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13, position: 'relative' }}>
       <Toolbar
         previewEnabled={previewEnabled}
@@ -3778,6 +4175,10 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
             onClearSelection={() => setSelection(null)}
             onSelectSection={(sId) => setSelection({ type: 'section', sectionId: sId })}
             onSelectBlock={(sId, cId, bId) => setSelection({ type: 'block', sectionId: sId, columnId: cId, blockId: bId })}
+            sampleBlocks={sampleBlocks}
+            userTemplates={userTemplates}
+            customTabs={customTabs}
+            features={features}
           />
         )}
         <Canvas
@@ -3833,5 +4234,6 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
       </DragOverlay>
       </DndContext>
     </div>
+    </PaletteContext.Provider>
   );
 }
