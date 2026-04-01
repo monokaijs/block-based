@@ -6,6 +6,7 @@ import {
   DragOverlay,
   PointerSensor,
   closestCenter,
+  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -1986,14 +1987,137 @@ const BLOCK_LAYOUTS: Array<{ id: string; columns: number[] }> = [
   { id: 'split-focus', columns: [40, 20, 40] },
 ];
 
-let transparentDragImage: HTMLImageElement | null = null;
+function DraggablePaletteBlock({
+  type,
+  label,
+  Icon,
+  desc,
+}: {
+  type: EmailBlockType;
+  label: string;
+  Icon: React.FC<LucideProps>;
+  desc: string;
+}) {
+  const id = `palette-block:${type}`;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id,
+    data: { kind: 'palette-block', blockType: type },
+  });
 
-function suppressNativeDragImage(event: React.DragEvent<HTMLElement>): void {
-  if (!transparentDragImage) {
-    transparentDragImage = new Image();
-    transparentDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-  }
-  event.dataTransfer.setDragImage(transparentDragImage, 0, 0);
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      title={`${desc} — drag into a row column`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+        minHeight: 82,
+        border: `1px solid #d4d4d8`,
+        borderRadius: 2,
+        background: '#ffffff',
+        color: '#3f3f46',
+        cursor: 'grab',
+        fontSize: 10,
+        boxShadow: '0 1px 1px rgba(0,0,0,.04)',
+        padding: '8px 6px',
+        opacity: isDragging ? 0.4 : 1,
+        touchAction: 'none',
+      }}
+    >
+      <Icon size={20} strokeWidth={1.9} />
+      <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
+    </button>
+  );
+}
+
+function DraggablePaletteRow({
+  label,
+  Icon,
+  desc,
+  columns,
+}: {
+  label: string;
+  Icon: React.FC<LucideProps>;
+  desc: string;
+  columns: number[];
+}) {
+  const id = `palette-row:${label}:${JSON.stringify(columns)}`;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id,
+    data: { kind: 'palette-row', columns },
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      title={`${desc} — drag into canvas`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+        minHeight: 82,
+        border: `1px solid #d4d4d8`,
+        borderRadius: 2,
+        background: '#ffffff',
+        color: '#3f3f46',
+        cursor: 'grab',
+        fontSize: 10,
+        boxShadow: '0 1px 1px rgba(0,0,0,.04)',
+        padding: '8px 6px',
+        opacity: isDragging ? 0.4 : 1,
+        touchAction: 'none',
+      }}
+    >
+      <Icon size={20} strokeWidth={1.9} />
+      <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
+    </button>
+  );
+}
+
+function DraggableLayoutRowPreview({ columns, layoutId }: { columns: number[]; layoutId: string }) {
+  const id = `palette-layout:${layoutId}`;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id,
+    data: { kind: 'palette-row', columns },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{
+        width: '100%',
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'grab',
+        opacity: isDragging ? 0.4 : 1,
+        touchAction: 'none',
+      }}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: columns.map((width) => `${width}fr`).join(' '), gap: 0, border: `1px solid #d4d4d8`, borderRadius: 3, overflow: 'hidden', minHeight: 64, background: '#ffffff' }}>
+        {columns.map((_, index) => (
+          <div
+            key={index}
+            style={{
+              borderLeft: index === 0 ? 'none' : `1px solid #d4d4d8`,
+              background: '#ffffff',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function RailItem({
@@ -2052,45 +2176,6 @@ function RailItem({
   );
 }
 
-function LayoutRowPreview({
-  columns,
-  onPreviewDragStart,
-}: {
-  columns: number[];
-  onPreviewDragStart: (columns: number[], event: React.DragEvent<HTMLElement>) => void;
-}) {
-  return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData(ROW_DRAG_TYPE, JSON.stringify(columns));
-        e.dataTransfer.effectAllowed = 'copy';
-        suppressNativeDragImage(e);
-        onPreviewDragStart(columns, e);
-      }}
-      style={{
-        width: '100%',
-        border: 'none',
-        background: 'transparent',
-        padding: 0,
-        cursor: 'grab',
-      }}
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: columns.map((width) => `${width}fr`).join(' '), gap: 0, border: `1px solid #d4d4d8`, borderRadius: 3, overflow: 'hidden', minHeight: 64, background: '#ffffff' }}>
-        {columns.map((_, index) => (
-          <div
-            key={index}
-            style={{
-              borderLeft: index === 0 ? 'none' : `1px solid #d4d4d8`,
-              background: '#ffffff',
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Sidebar({
   activeTab,
   onTabChange,
@@ -2105,8 +2190,6 @@ function Sidebar({
   onUpdateSection,
   onDeleteSection,
   onClearSelection,
-  onPaletteBlockDragStart,
-  onPaletteRowDragStart,
 }: {
   activeTab: 'blocks' | 'sections' | 'settings';
   onTabChange: (t: 'blocks' | 'sections' | 'settings') => void;
@@ -2121,8 +2204,6 @@ function Sidebar({
   onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
   onDeleteSection: (sId: string) => void;
   onClearSelection: () => void;
-  onPaletteBlockDragStart: (type: EmailBlockType, event: React.DragEvent<HTMLElement>) => void;
-  onPaletteRowDragStart: (columns: number[], event: React.DragEvent<HTMLElement>) => void;
 }) {
   const shellStyle: React.CSSProperties = {
     width: 380,
@@ -2253,10 +2334,10 @@ function Sidebar({
         <div style={{ fontSize: 11, fontWeight: 500, color: '#3f3f46', marginBottom: 10 }}>Drag row layout</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {BLOCK_LAYOUTS.map((layout) => (
-            <LayoutRowPreview
+            <DraggableLayoutRowPreview
               key={layout.id}
               columns={layout.columns}
-              onPreviewDragStart={onPaletteRowDragStart}
+              layoutId={layout.id}
             />
           ))}
         </div>
@@ -2285,70 +2366,22 @@ function Sidebar({
     'Content',
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
       {ROW_PALETTE.map(({ label, Icon, desc, columns }) => (
-        <button
+        <DraggablePaletteRow
           key={label}
-          draggable
-          data-drag-kind="row"
-          onDragStart={(e) => {
-            e.dataTransfer.setData(ROW_DRAG_TYPE, JSON.stringify(columns));
-            e.dataTransfer.effectAllowed = 'copy';
-            suppressNativeDragImage(e);
-            onPaletteRowDragStart(columns, e);
-          }}
-          title={`${desc} — drag into canvas`}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 7,
-            minHeight: 82,
-            border: `1px solid #d4d4d8`,
-            borderRadius: 2,
-            background: '#ffffff',
-            color: '#3f3f46',
-            cursor: 'grab',
-            fontSize: 10,
-            boxShadow: '0 1px 1px rgba(0,0,0,.04)',
-            padding: '8px 6px',
-          }}
-        >
-          <Icon size={20} strokeWidth={1.9} />
-          <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
-        </button>
+          label={label}
+          Icon={Icon}
+          desc={desc}
+          columns={columns}
+        />
       ))}
       {BLOCK_PALETTE.map(({ type, label, Icon, desc }) => (
-        <button
+        <DraggablePaletteBlock
           key={type}
-          draggable
-          data-drag-kind="block"
-          onDragStart={(e) => {
-            e.dataTransfer.setData(BLOCK_DRAG_TYPE, type);
-            e.dataTransfer.effectAllowed = 'copy';
-            suppressNativeDragImage(e);
-            onPaletteBlockDragStart(type, e);
-          }}
-          title={`${desc} — drag into a row column`}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 7,
-            minHeight: 82,
-            border: `1px solid #d4d4d8`,
-            borderRadius: 2,
-            background: '#ffffff',
-            color: '#3f3f46',
-            cursor: 'grab',
-            fontSize: 10,
-            boxShadow: '0 1px 1px rgba(0,0,0,.04)',
-            padding: '8px 6px',
-          }}
-        >
-          <Icon size={20} strokeWidth={1.9} />
-          <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.2 }}>{label}</span>
-        </button>
+          type={type}
+          label={label}
+          Icon={Icon}
+          desc={desc}
+        />
       ))}
     </div>,
   );
@@ -2398,6 +2431,8 @@ function Canvas({
   doc,
   selection,
   previewMode,
+  draggingPayload,
+  isRowDragging,
   onSelectBlock,
   onSelectSection,
   onMoveSection,
@@ -2406,12 +2441,13 @@ function Canvas({
   onAddBlock,
   onAddRowAt,
   onMoveSectionToIndex,
-  onMoveBlock,
   onClearSelection,
 }: {
   doc: EmailDocument;
   selection: Selection;
   previewMode: 'desktop' | 'mobile';
+  draggingPayload: BlockDragPayload | null;
+  isRowDragging: boolean;
   onSelectBlock: (sel: Selection) => void;
   onSelectSection: (sId: string) => void;
   onMoveSection: (sId: string, dir: -1 | 1) => void;
@@ -2420,200 +2456,17 @@ function Canvas({
   onAddBlock: (sId: string, cId: string, type: EmailBlockType, atIndex?: number) => void;
   onAddRowAt: (index: number, widths: number[]) => void;
   onMoveSectionToIndex: (sectionId: string, toIndex: number) => void;
-  onMoveBlock: (payload: BlockDragPayload, targetSectionId: string, targetColumnId: string, atIndex: number) => void;
   onClearSelection: () => void;
 }) {
   const isMobilePreview = previewMode === 'mobile';
   const rowContentWidth = isMobilePreview ? 375 : doc.settings.contentWidth;
   const canvasWidth: React.CSSProperties['width'] = isMobilePreview ? 375 : '100%';
 
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragKind, setDragKind] = useState<'row' | 'section' | null>(null);
-  const [draggingPayload, setDraggingPayload] = useState<BlockDragPayload | null>(null);
-  const isRowDragging = isDragging && (dragKind === 'row' || dragKind === 'section');
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-  const [activeBlockOverlayWidth, setActiveBlockOverlayWidth] = useState<number | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
-  const findBlockLocation = useCallback(
-    (blockId: string) => {
-      for (const section of doc.sections) {
-        for (const column of section.columns) {
-          const index = column.blocks.findIndex((block) => block.id === blockId);
-          if (index !== -1) {
-            return {
-              sectionId: section.id,
-              columnId: column.id,
-              index,
-            };
-          }
-        }
-      }
-      return null;
-    },
-    [doc.sections],
-  );
-
-  const activeBlock = activeBlockId
-    ? doc.sections
-        .flatMap((section) => section.columns)
-        .flatMap((column) => column.blocks)
-        .find((block) => block.id === activeBlockId) ?? null
-    : null;
-
-  const resolveDropTarget = useCallback(
-    (over: DragEndEvent['over'] | DragOverEvent['over']) => {
-      if (!over) return null;
-      const overData = over.data.current as
-        | { kind?: 'block'; sectionId?: string; columnId?: string }
-        | { kind?: 'column'; sectionId?: string; columnId?: string }
-        | undefined;
-
-      if (overData?.kind === 'column' && overData.sectionId && overData.columnId) {
-        const section = doc.sections.find((item) => item.id === overData.sectionId);
-        const column = section?.columns.find((item) => item.id === overData.columnId);
-        if (!column) return null;
-        return {
-          sectionId: overData.sectionId,
-          columnId: overData.columnId,
-          index: column.blocks.length,
-        };
-      }
-
-      const blockLocation = findBlockLocation(String(over.id));
-      if (!blockLocation) return null;
-      return blockLocation;
-    },
-    [doc.sections, findBlockLocation],
-  );
-
-  const onBlockDragStart = useCallback(
-    (event: DragStartEvent) => {
-      const blockId = String(event.active.id);
-      const location = findBlockLocation(blockId);
-      if (!location) return;
-      const dragElement = document.querySelector<HTMLElement>(`[data-block-id="${blockId}"]`);
-      const measuredWidth =
-        dragElement?.getBoundingClientRect().width ??
-        event.active.rect.current.initial?.width ??
-        null;
-      setActiveBlockOverlayWidth(typeof measuredWidth === 'number' ? measuredWidth : null);
-      setActiveBlockId(blockId);
-      setDraggingPayload({
-        sectionId: location.sectionId,
-        columnId: location.columnId,
-        blockId,
-      });
-    },
-    [findBlockLocation],
-  );
-
-  const onBlockDragOver = useCallback(
-    (event: DragOverEvent) => {
-      if (!event.over) return;
-      const activeId = String(event.active.id);
-      const source = findBlockLocation(activeId);
-      const target = resolveDropTarget(event.over);
-      if (!source || !target) return;
-
-      const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
-      if (isSameColumn) return;
-
-      onMoveBlock(
-        { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
-        target.sectionId,
-        target.columnId,
-        target.index,
-      );
-    },
-    [findBlockLocation, onMoveBlock, resolveDropTarget],
-  );
-
-  const onBlockDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const activeId = String(event.active.id);
-      const source = findBlockLocation(activeId);
-      const target = resolveDropTarget(event.over);
-
-      if (source && target) {
-        const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
-        let targetIndex = target.index;
-        if (isSameColumn && source.index < target.index) {
-          targetIndex = target.index + 1;
-        }
-
-        onMoveBlock(
-          { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
-          target.sectionId,
-          target.columnId,
-          targetIndex,
-        );
-      }
-
-      setActiveBlockId(null);
-      setActiveBlockOverlayWidth(null);
-      setDraggingPayload(null);
-    },
-    [findBlockLocation, onMoveBlock, resolveDropTarget],
-  );
-
-  const onBlockDragCancel = useCallback(() => {
-    setActiveBlockId(null);
-    setActiveBlockOverlayWidth(null);
-    setDraggingPayload(null);
-  }, []);
-
-  useEffect(() => {
-    const getDragKind = (e: DragEvent): 'row' | 'section' | null => {
-      const targetElement = e.target instanceof Element
-        ? e.target
-        : e.target instanceof Node
-          ? e.target.parentElement
-          : null;
-      const target = targetElement?.closest('[data-drag-kind]') ?? null;
-      const attrKind = target?.getAttribute('data-drag-kind');
-      if (attrKind === 'row' || attrKind === 'section') {
-        return attrKind;
-      }
-
-      if (e.dataTransfer?.types.includes(SECTION_DRAG_TYPE)) return 'section';
-      if (e.dataTransfer?.types.includes(ROW_DRAG_TYPE)) return 'row';
-      return null;
-    };
-
-    const onStart = (e: DragEvent) => {
-      const kind = getDragKind(e);
-      if (!kind) return;
-      setDragKind(kind);
-      setIsDragging(true);
-    };
-    const onEnd = () => {
-      setIsDragging(false);
-      setDragKind(null);
-    };
-    window.addEventListener('dragstart', onStart, true);
-    window.addEventListener('dragend', onEnd, true);
-    window.addEventListener('drop', onEnd, true);
-    return () => {
-      window.removeEventListener('dragstart', onStart, true);
-      window.removeEventListener('dragend', onEnd, true);
-      window.removeEventListener('drop', onEnd, true);
-    };
-  }, []);
-
   return (
     <div
       style={{ flex: 1, overflowY: 'auto', background: C.canvasBg, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24 }}
       onClick={onClearSelection}
     >
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={onBlockDragStart}
-        onDragOver={onBlockDragOver}
-        onDragEnd={onBlockDragEnd}
-        onDragCancel={onBlockDragCancel}
-      >
         <div
           style={{
             width: canvasWidth,
@@ -2674,19 +2527,6 @@ function Canvas({
           />
         )}
         </div>
-        <DragOverlay>
-          {activeBlock ? (
-            <div style={{ width: activeBlockOverlayWidth ?? undefined, pointerEvents: 'none' }}>
-              <BlockPreview
-                block={activeBlock}
-                fontFamily={doc.settings.fontFamily}
-                isSelected={false}
-                onClick={() => {}}
-              />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
     </div>
   );
 }
@@ -2700,11 +2540,17 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
   const [selection, setSelection] = useState<Selection>(null);
   const [activeTab, setActiveTab] = useState<'blocks' | 'sections' | 'settings'>('blocks');
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  const [paletteDragPreview, setPaletteDragPreview] = useState<
-    | { kind: 'block'; block: EmailBlock; x: number; y: number }
-    | { kind: 'row'; columns: number[]; x: number; y: number }
-    | null
-  >(null);
+
+  // ── Drag state (lifted from Canvas) ────────────────────────────────────────
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragKind, setDragKind] = useState<'row' | 'section' | null>(null);
+  const [draggingPayload, setDraggingPayload] = useState<BlockDragPayload | null>(null);
+  const isRowDragging = isDragging && (dragKind === 'row' || dragKind === 'section');
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [activeBlockOverlayWidth, setActiveBlockOverlayWidth] = useState<number | null>(null);
+  const [activePaletteBlock, setActivePaletteBlock] = useState<EmailBlock | null>(null);
+  const [activePaletteRow, setActivePaletteRow] = useState<number[] | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const update = useCallback(
     (next: EmailDocument) => {
@@ -2912,52 +2758,227 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
     [doc, update],
   );
 
-  const startPaletteBlockPreview = useCallback((type: EmailBlockType, event: React.DragEvent<HTMLElement>) => {
-    setPaletteDragPreview({
-      kind: 'block',
-      block: createBlock(type),
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
+  // ── Drag helpers (lifted from Canvas) ──────────────────────────────────────
 
-  const startPaletteRowPreview = useCallback((columns: number[], event: React.DragEvent<HTMLElement>) => {
-    setPaletteDragPreview({
-      kind: 'row',
-      columns,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
+  const findBlockLocation = useCallback(
+    (blockId: string) => {
+      for (const section of doc.sections) {
+        for (const column of section.columns) {
+          const index = column.blocks.findIndex((block) => block.id === blockId);
+          if (index !== -1) {
+            return { sectionId: section.id, columnId: column.id, index };
+          }
+        }
+      }
+      return null;
+    },
+    [doc.sections],
+  );
 
-  useEffect(() => {
-    if (!paletteDragPreview) return;
+  const activeBlock = activeBlockId
+    ? doc.sections
+        .flatMap((section) => section.columns)
+        .flatMap((column) => column.blocks)
+        .find((block) => block.id === activeBlockId) ?? null
+    : null;
 
-    const onDragOver = (event: DragEvent) => {
-      setPaletteDragPreview((current) => {
-        if (!current) return current;
-        return { ...current, x: event.clientX, y: event.clientY };
+  const resolveDropTarget = useCallback(
+    (over: DragEndEvent['over'] | DragOverEvent['over']) => {
+      if (!over) return null;
+      const overData = over.data.current as
+        | { kind?: 'block'; sectionId?: string; columnId?: string }
+        | { kind?: 'column'; sectionId?: string; columnId?: string }
+        | undefined;
+
+      if (overData?.kind === 'column' && overData.sectionId && overData.columnId) {
+        const section = doc.sections.find((item) => item.id === overData.sectionId);
+        const column = section?.columns.find((item) => item.id === overData.columnId);
+        if (!column) return null;
+        return { sectionId: overData.sectionId, columnId: overData.columnId, index: column.blocks.length };
+      }
+
+      const blockLocation = findBlockLocation(String(over.id));
+      if (!blockLocation) return null;
+      return blockLocation;
+    },
+    [doc.sections, findBlockLocation],
+  );
+
+  const onDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const data = event.active.data.current as Record<string, unknown> | undefined;
+      const kind = data?.kind as string | undefined;
+
+      if (kind === 'palette-block') {
+        const blockType = data!.blockType as EmailBlockType;
+        const block = createBlock(blockType);
+        setActivePaletteBlock(block);
+        setActiveBlockOverlayWidth(320);
+        return;
+      }
+
+      if (kind === 'palette-row') {
+        const columns = data!.columns as number[];
+        setActivePaletteRow(columns);
+        return;
+      }
+
+      // Existing block reorder
+      const blockId = String(event.active.id);
+      const location = findBlockLocation(blockId);
+      if (!location) return;
+      const dragElement = document.querySelector<HTMLElement>(`[data-block-id="${blockId}"]`);
+      const measuredWidth =
+        dragElement?.getBoundingClientRect().width ??
+        event.active.rect.current.initial?.width ??
+        null;
+      setActiveBlockOverlayWidth(typeof measuredWidth === 'number' ? measuredWidth : null);
+      setActiveBlockId(blockId);
+      setDraggingPayload({
+        sectionId: location.sectionId,
+        columnId: location.columnId,
+        blockId,
       });
+    },
+    [findBlockLocation],
+  );
+
+  const onDragOver = useCallback(
+    (event: DragOverEvent) => {
+      if (!event.over) return;
+      const data = event.active.data.current as Record<string, unknown> | undefined;
+      const kind = data?.kind as string | undefined;
+      // For palette items, don't do cross-column moves mid-drag
+      if (kind === 'palette-block' || kind === 'palette-row') return;
+
+      const activeId = String(event.active.id);
+      const source = findBlockLocation(activeId);
+      const target = resolveDropTarget(event.over);
+      if (!source || !target) return;
+
+      const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
+      if (isSameColumn) return;
+
+      moveBlock(
+        { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
+        target.sectionId,
+        target.columnId,
+        target.index,
+      );
+    },
+    [findBlockLocation, moveBlock, resolveDropTarget],
+  );
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const data = event.active.data.current as Record<string, unknown> | undefined;
+      const kind = data?.kind as string | undefined;
+
+      if (kind === 'palette-block' && activePaletteBlock) {
+        const target = resolveDropTarget(event.over);
+        if (target) {
+          addBlockToColumn(target.sectionId, target.columnId, activePaletteBlock.type, target.index);
+        }
+        setActivePaletteBlock(null);
+        setActiveBlockOverlayWidth(null);
+        return;
+      }
+
+      if (kind === 'palette-row' && activePaletteRow) {
+        // For now, palette rows add to the end
+        // TODO: Could detect a row-drop-zone target
+        setActivePaletteRow(null);
+        return;
+      }
+
+      // Existing block reorder
+      const activeId = String(event.active.id);
+      const source = findBlockLocation(activeId);
+      const target = resolveDropTarget(event.over);
+
+      if (source && target) {
+        const isSameColumn = source.sectionId === target.sectionId && source.columnId === target.columnId;
+        let targetIndex = target.index;
+        if (isSameColumn && source.index < target.index) {
+          targetIndex = target.index + 1;
+        }
+
+        moveBlock(
+          { sectionId: source.sectionId, columnId: source.columnId, blockId: activeId },
+          target.sectionId,
+          target.columnId,
+          targetIndex,
+        );
+      }
+
+      setActiveBlockId(null);
+      setActiveBlockOverlayWidth(null);
+      setDraggingPayload(null);
+    },
+    [activePaletteBlock, activePaletteRow, addBlockToColumn, findBlockLocation, moveBlock, resolveDropTarget],
+  );
+
+  const onDragCancel = useCallback(() => {
+    setActiveBlockId(null);
+    setActiveBlockOverlayWidth(null);
+    setDraggingPayload(null);
+    setActivePaletteBlock(null);
+    setActivePaletteRow(null);
+  }, []);
+
+  // ── Native HTML5 drag detection for row/section drag (RowDropZones still use HTML5) ──
+  useEffect(() => {
+    const getDragKind = (e: DragEvent): 'row' | 'section' | null => {
+      const targetElement = e.target instanceof Element
+        ? e.target
+        : e.target instanceof Node
+          ? e.target.parentElement
+          : null;
+      const target = targetElement?.closest('[data-drag-kind]') ?? null;
+      const attrKind = target?.getAttribute('data-drag-kind');
+      if (attrKind === 'row' || attrKind === 'section') {
+        return attrKind;
+      }
+
+      if (e.dataTransfer?.types.includes(SECTION_DRAG_TYPE)) return 'section';
+      if (e.dataTransfer?.types.includes(ROW_DRAG_TYPE)) return 'row';
+      return null;
     };
 
-    const clearPreview = () => {
-      setPaletteDragPreview(null);
+    const onStart = (e: DragEvent) => {
+      const kind = getDragKind(e);
+      if (!kind) return;
+      setDragKind(kind);
+      setIsDragging(true);
     };
-
-    window.addEventListener('dragover', onDragOver, true);
-    window.addEventListener('dragend', clearPreview, true);
-    window.addEventListener('drop', clearPreview, true);
-
+    const onEnd = () => {
+      setIsDragging(false);
+      setDragKind(null);
+    };
+    window.addEventListener('dragstart', onStart, true);
+    window.addEventListener('dragend', onEnd, true);
+    window.addEventListener('drop', onEnd, true);
     return () => {
-      window.removeEventListener('dragover', onDragOver, true);
-      window.removeEventListener('dragend', clearPreview, true);
-      window.removeEventListener('drop', clearPreview, true);
+      window.removeEventListener('dragstart', onStart, true);
+      window.removeEventListener('dragend', onEnd, true);
+      window.removeEventListener('drop', onEnd, true);
     };
-  }, [paletteDragPreview]);
+  }, []);
+
+  // Determine overlay block to show
+  const overlayBlock = activeBlock ?? activePaletteBlock;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13, position: 'relative' }}>
       <Toolbar previewMode={previewMode} onPreviewMode={setPreviewMode} />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
+      >
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Sidebar
           activeTab={activeTab}
@@ -2973,13 +2994,13 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           onUpdateSection={updateSection}
           onDeleteSection={deleteSection}
           onClearSelection={() => setSelection(null)}
-          onPaletteBlockDragStart={startPaletteBlockPreview}
-          onPaletteRowDragStart={startPaletteRowPreview}
         />
         <Canvas
           doc={doc}
           selection={selection}
           previewMode={previewMode}
+          draggingPayload={draggingPayload}
+          isRowDragging={isRowDragging}
           onSelectBlock={setSelection}
           onSelectSection={(sId) => setSelection({ type: 'section', sectionId: sId })}
           onMoveSection={moveSection}
@@ -2988,50 +3009,40 @@ export function EmailBlockEditor({ value, onChange, height = '100%' }: EmailBloc
           onAddBlock={addBlockToColumn}
           onAddRowAt={addRowAt}
           onMoveSectionToIndex={moveSectionToIndex}
-          onMoveBlock={moveBlock}
           onClearSelection={() => setSelection(null)}
         />
       </div>
-      {paletteDragPreview && (
-        <div
-          style={{
-            position: 'fixed',
-            left: paletteDragPreview.x + 12,
-            top: paletteDragPreview.y + 12,
-            zIndex: 9999,
-            pointerEvents: 'none',
-          }}
-        >
-          {paletteDragPreview.kind === 'block' ? (
-            <div style={{ width: 320, pointerEvents: 'none' }}>
-              <BlockPreview
-                block={paletteDragPreview.block}
-                fontFamily={doc.settings.fontFamily}
-                isSelected={false}
-                onClick={() => {}}
-              />
-            </div>
-          ) : (
-            <div
-              style={{
-                width: 220,
-                display: 'grid',
-                gridTemplateColumns: paletteDragPreview.columns.map((width) => `${width}fr`).join(' '),
-                border: `1px solid ${C.inspectorBorder}`,
-                borderRadius: 6,
-                overflow: 'hidden',
-                background: '#ffffff',
-                minHeight: 58,
-                boxShadow: '0 4px 18px rgba(0,0,0,.14)',
-              }}
-            >
-              {paletteDragPreview.columns.map((_, index) => (
-                <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${C.inspectorBorder}` }} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <DragOverlay>
+        {overlayBlock ? (
+          <div style={{ width: activeBlockOverlayWidth ?? undefined, pointerEvents: 'none' }}>
+            <BlockPreview
+              block={overlayBlock}
+              fontFamily={doc.settings.fontFamily}
+              isSelected={false}
+              onClick={() => {}}
+            />
+          </div>
+        ) : activePaletteRow ? (
+          <div
+            style={{
+              width: 220,
+              display: 'grid',
+              gridTemplateColumns: activePaletteRow.map((w) => `${w}fr`).join(' '),
+              border: `1px solid ${C.inspectorBorder}`,
+              borderRadius: 6,
+              overflow: 'hidden',
+              background: '#ffffff',
+              minHeight: 58,
+              boxShadow: '0 4px 18px rgba(0,0,0,.14)',
+            }}
+          >
+            {activePaletteRow.map((_, index) => (
+              <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${C.inspectorBorder}` }} />
+            ))}
+          </div>
+        ) : null}
+      </DragOverlay>
+      </DndContext>
     </div>
   );
 }
