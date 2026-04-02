@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@block-based/block-builder': path.resolve(__dirname, '../../packages/block-builder/src/index.ts'),
+      '@block-based/block-based': path.resolve(__dirname, '../../packages/block-builder/src/index.ts'),
     },
   },
 });

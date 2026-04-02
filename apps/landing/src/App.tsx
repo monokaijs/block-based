@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-builder';
-import type { EmailDocument } from '@block-based/block-builder';
+import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-based';
+import type { EmailDocument } from '@block-based/block-based';
 
 // ─── Colour tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -279,7 +279,7 @@ const FEATURES = [
   },
 ];
 
-const CODE_EXAMPLE = `import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-builder';
+const CODE_EXAMPLE = `import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-based';
 import { useState } from 'react';
 
 export function App() {

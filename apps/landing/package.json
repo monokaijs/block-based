@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@block-based/block-builder": "workspace:*",
+    "@block-based/block-based": "workspace:*",
     "lucide-react": "^0.575.0",
     "react": "^19",
     "react-dom": "^19"

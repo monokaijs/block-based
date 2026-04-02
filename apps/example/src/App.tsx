@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Check, Clipboard } from 'lucide-react';
-import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-builder';
-import type { EmailDocument } from '@block-based/block-builder';
+import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from '@block-based/block-based';
+import type { EmailDocument } from '@block-based/block-based';
 
 type Tab = 'editor' | 'json' | 'html';
 

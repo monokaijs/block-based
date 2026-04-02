@@ -1,10 +1,10 @@
 # Block Based
 
-A monorepo for the `@block-based/block-builder` package — a React-based email block editor and renderer.
+A monorepo for the `@block-based/block-based` package — a React-based email block editor and renderer.
 
 ## Packages
 
-- **`packages/block-builder`** — Core library: types, document model, block normalizers, HTML renderer, and the `EmailBlockEditor` React component.
+- **`packages/block-based`** — Core library: types, document model, block normalizers, HTML renderer, and the `EmailBlockEditor` React component.
 
 ## Apps
 

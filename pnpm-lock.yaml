@@ -14,7 +14,7 @@ importers:
 
   apps/example:
     dependencies:
-      '@block-based/block-builder':
+      '@block-based/block-based':
         specifier: workspace:*
         version: link:../../packages/block-builder
       lucide-react:
@@ -45,7 +45,7 @@ importers:
 
   apps/landing:
     dependencies:
-      '@block-based/block-builder':
+      '@block-based/block-based':
         specifier: workspace:*
         version: link:../../packages/block-builder
       lucide-react:
