@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Github } from "lucide-react";
+import { Box, Github } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/docs", label: "Docs" },
+  { href: "/example", label: "Example" },
 ];
 
 export function Navbar() {
@@ -17,7 +18,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <span className="text-primary text-lg">&#x2B61;</span>
+          <Box className="h-5 w-5 text-primary" />
           Block Based
         </Link>
 
