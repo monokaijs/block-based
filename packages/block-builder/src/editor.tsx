@@ -111,7 +111,7 @@ type Selection =
   | { type: 'section'; sectionId: string }
   | null;
 
-type SidebarTab = 'blocks' | 'sections' | 'templates' | 'tree' | 'settings' | string;
+type SidebarTab = 'blocks' | 'sections' | 'templates' | 'tree' | string;
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
 
 const DEFAULT_FEATURES: EditorFeatures = {
@@ -3214,7 +3214,6 @@ function Sidebar({
     ...(features.rows ? [{ id: 'sections' as SidebarTab, label: 'Rows', Icon: MinusSquare }] : []),
     ...(features.templates ? [{ id: 'templates' as SidebarTab, label: 'Templates', Icon: Layers }] : []),
     ...(features.treeView ? [{ id: 'tree' as SidebarTab, label: 'Tree', Icon: ListTree }] : []),
-    ...(features.bodySettings ? [{ id: 'settings' as SidebarTab, label: 'Body', Icon: TypeIcon }] : []),
     { id: 'json' as SidebarTab, label: 'JSON', Icon: Braces },
     { id: 'html' as SidebarTab, label: 'HTML', Icon: FileCode },
     ...(customTabs ?? []).map((tab) => ({
@@ -3266,199 +3265,7 @@ function Sidebar({
     );
   }
 
-  if (activeTab === 'settings') {
-    const fontFamilyOptions = [
-      { value: "'Inter', 'Helvetica Neue', Arial, sans-serif", label: 'Inter' },
-      { value: "'Georgia', serif", label: 'Georgia' },
-      { value: "'Courier New', monospace", label: 'Courier New' },
-      { value: "'Arial', 'Helvetica', sans-serif", label: 'Arial' },
-      { value: "'Verdana', sans-serif", label: 'Verdana' },
-      { value: "'Trebuchet MS', sans-serif", label: 'Trebuchet MS' },
-      { value: "'Times New Roman', serif", label: 'Times New Roman' },
-      { value: "'Roboto', 'Helvetica Neue', Arial, sans-serif", label: 'Roboto' },
-    ];
 
-    const fontWeightOptions = [
-      { value: '300', label: 'Light' },
-      { value: '400', label: 'Regular' },
-      { value: '500', label: 'Medium' },
-      { value: '600', label: 'Semi Bold' },
-      { value: '700', label: 'Bold' },
-    ];
-
-    return renderShell(
-      'Body',
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <InspectorSection title="Typography">
-          <Field label="Font Family">
-            <SelectInput value={doc.settings.fontFamily} options={fontFamilyOptions} onChange={(v) => onUpdateSettings({ fontFamily: v })} />
-          </Field>
-          <Field label="Base Font Size">
-            <NumberInput value={doc.settings.fontSize} min={10} max={32} onChange={(v) => onUpdateSettings({ fontSize: v })} />
-          </Field>
-          <Field label="Font Weight">
-            <SelectInput value={String(doc.settings.fontWeight)} options={fontWeightOptions} onChange={(v) => onUpdateSettings({ fontWeight: Number(v) })} />
-          </Field>
-          <Field label="Text Color">
-            <PaletteColorPicker value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
-          </Field>
-          <Field label="Link Color">
-            <PaletteColorPicker value={doc.settings.linkColor} onChange={(v) => onUpdateSettings({ linkColor: v })} />
-          </Field>
-          <Field label="Underline Links">
-            <button
-              onClick={() => onUpdateSettings({ linkUnderline: !doc.settings.linkUnderline })}
-              style={{
-                padding: '5px 12px',
-                border: `1px solid ${doc.settings.linkUnderline ? C.accent : C.inspectorBorder}`,
-                borderRadius: 6,
-                background: doc.settings.linkUnderline ? `${C.accent}12` : '#fafafa',
-                color: doc.settings.linkUnderline ? C.accent : '#71717a',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              {doc.settings.linkUnderline ? 'Yes' : 'No'}
-            </button>
-          </Field>
-        </InspectorSection>
-
-        <InspectorSection title="Color Palette">
-          {(
-            [
-              { label: 'Base', keys: ['background', 'foreground'] as (keyof ColorPalette)[] },
-              { label: 'Card', keys: ['card', 'cardForeground'] as (keyof ColorPalette)[] },
-              { label: 'Primary', keys: ['primary', 'primaryForeground'] as (keyof ColorPalette)[] },
-              { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] as (keyof ColorPalette)[] },
-              { label: 'Accent', keys: ['accent', 'accentForeground'] as (keyof ColorPalette)[] },
-              { label: 'Muted', keys: ['muted', 'mutedForeground'] as (keyof ColorPalette)[] },
-              { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] as (keyof ColorPalette)[] },
-              { label: 'Borders', keys: ['border', 'input', 'ring'] as (keyof ColorPalette)[] },
-            ] as const
-          ).map(({ label, keys }) => (
-            <div key={label} style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-              {keys.map((key) => (
-                <Field key={key} label={COLOR_PALETTE_LABELS[key]}>
-                  <ColorInput
-                    value={doc.settings.colorPalette[key]}
-                    onChange={(v) =>
-                      onUpdateSettings({ colorPalette: { ...doc.settings.colorPalette, [key]: v } })
-                    }
-                  />
-                </Field>
-              ))}
-            </div>
-          ))}
-        </InspectorSection>
-
-        <InspectorSection title="Custom Colors">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {doc.settings.customColors.map((cc, idx) => (
-              <div key={cc.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Name</div>
-                  <input
-                    style={{ ...inputStyle, width: '100%' }}
-                    value={cc.label}
-                    onChange={(e) => {
-                      const updated = [...doc.settings.customColors];
-                      updated[idx] = { ...cc, label: e.target.value };
-                      onUpdateSettings({ customColors: updated });
-                    }}
-                    placeholder="Color name"
-                  />
-                </div>
-                <div style={{ width: 80 }}>
-                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Value</div>
-                  <ColorInput
-                    value={cc.value}
-                    onChange={(v) => {
-                      const updated = [...doc.settings.customColors];
-                      updated[idx] = { ...cc, value: v };
-                      onUpdateSettings({ customColors: updated });
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    const updated = doc.settings.customColors.filter((_, i) => i !== idx);
-                    onUpdateSettings({ customColors: updated });
-                  }}
-                  title="Remove color"
-                  style={{ width: 28, height: 28, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                const newColor: CustomColor = { id: nextId('cc'), label: 'Custom', value: '#6366f1' };
-                onUpdateSettings({ customColors: [...doc.settings.customColors, newColor] });
-              }}
-              style={{
-                padding: '6px 12px',
-                border: `1px dashed ${C.inspectorBorder}`,
-                borderRadius: 6,
-                background: '#fafafa',
-                color: '#52525b',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <Plus size={12} /> Add Custom Color
-            </button>
-          </div>
-        </InspectorSection>
-
-        <InspectorSection title="Layout">
-          <Field label="Background Color">
-            <PaletteColorPicker value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
-          </Field>
-          <Field label="Content Background">
-            <PaletteColorPicker value={doc.settings.contentBackgroundColor} onChange={(v) => onUpdateSettings({ contentBackgroundColor: v })} />
-          </Field>
-          <Field label="Content Width (px)">
-            <NumberInput value={doc.settings.contentWidth} min={320} max={1200} onChange={(v) => onUpdateSettings({ contentWidth: v })} />
-          </Field>
-          <Field label="Content Align">
-            <AlignButtons value={doc.settings.contentAlign} onChange={(v) => onUpdateSettings({ contentAlign: v })} />
-          </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-            <Field label="Pad Top">
-              <NumberInput value={doc.settings.contentPaddingTop} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingTop: v })} />
-            </Field>
-            <Field label="Pad Right">
-              <NumberInput value={doc.settings.contentPaddingRight} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingRight: v })} />
-            </Field>
-            <Field label="Pad Bottom">
-              <NumberInput value={doc.settings.contentPaddingBottom} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingBottom: v })} />
-            </Field>
-            <Field label="Pad Left">
-              <NumberInput value={doc.settings.contentPaddingLeft} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingLeft: v })} />
-            </Field>
-          </div>
-        </InspectorSection>
-
-        <InspectorSection title="Meta">
-          <Field label="Preheader Text">
-            <textarea
-              style={{ ...textareaStyle, minHeight: 60 }}
-              value={doc.settings.preheaderText}
-              onChange={(e) => onUpdateSettings({ preheaderText: e.target.value })}
-              placeholder="Preview text shown in inbox..."
-            />
-          </Field>
-        </InspectorSection>
-      </div>,
-    );
-  }
 
   if (activeTab === 'tree') {
     return renderShell(
@@ -3895,6 +3702,207 @@ function Canvas({
 
 // ─── Right inspector panel ───────────────────────────────────────────────────
 
+function BodySettingsPanel({
+  doc,
+  onUpdateSettings,
+}: {
+  doc: EmailDocument;
+  onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
+}) {
+  const fontFamilyOptions = [
+    { value: "'Inter', 'Helvetica Neue', Arial, sans-serif", label: 'Inter' },
+    { value: "'Georgia', serif", label: 'Georgia' },
+    { value: "'Courier New', monospace", label: 'Courier New' },
+    { value: "'Arial', 'Helvetica', sans-serif", label: 'Arial' },
+    { value: "'Verdana', sans-serif", label: 'Verdana' },
+    { value: "'Trebuchet MS', sans-serif", label: 'Trebuchet MS' },
+    { value: "'Times New Roman', serif", label: 'Times New Roman' },
+    { value: "'Roboto', 'Helvetica Neue', Arial, sans-serif", label: 'Roboto' },
+  ];
+
+  const fontWeightOptions = [
+    { value: '300', label: 'Light' },
+    { value: '400', label: 'Regular' },
+    { value: '500', label: 'Medium' },
+    { value: '600', label: 'Semi Bold' },
+    { value: '700', label: 'Bold' },
+  ];
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <InspectorSection title="Typography">
+          <Field label="Font Family">
+            <SelectInput value={doc.settings.fontFamily} options={fontFamilyOptions} onChange={(v) => onUpdateSettings({ fontFamily: v })} />
+          </Field>
+          <Field label="Base Font Size">
+            <NumberInput value={doc.settings.fontSize} min={10} max={32} onChange={(v) => onUpdateSettings({ fontSize: v })} />
+          </Field>
+          <Field label="Font Weight">
+            <SelectInput value={String(doc.settings.fontWeight)} options={fontWeightOptions} onChange={(v) => onUpdateSettings({ fontWeight: Number(v) })} />
+          </Field>
+          <Field label="Text Color">
+            <PaletteColorPicker value={doc.settings.bodyTextColor} onChange={(v) => onUpdateSettings({ bodyTextColor: v })} />
+          </Field>
+          <Field label="Link Color">
+            <PaletteColorPicker value={doc.settings.linkColor} onChange={(v) => onUpdateSettings({ linkColor: v })} />
+          </Field>
+          <Field label="Underline Links">
+            <button
+              onClick={() => onUpdateSettings({ linkUnderline: !doc.settings.linkUnderline })}
+              style={{
+                padding: '5px 12px',
+                border: `1px solid ${doc.settings.linkUnderline ? C.accent : C.inspectorBorder}`,
+                borderRadius: 6,
+                background: doc.settings.linkUnderline ? `${C.accent}12` : '#fafafa',
+                color: doc.settings.linkUnderline ? C.accent : '#71717a',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              {doc.settings.linkUnderline ? 'Yes' : 'No'}
+            </button>
+          </Field>
+        </InspectorSection>
+
+        <InspectorSection title="Color Palette">
+          {(
+            [
+              { label: 'Base', keys: ['background', 'foreground'] as (keyof ColorPalette)[] },
+              { label: 'Card', keys: ['card', 'cardForeground'] as (keyof ColorPalette)[] },
+              { label: 'Primary', keys: ['primary', 'primaryForeground'] as (keyof ColorPalette)[] },
+              { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] as (keyof ColorPalette)[] },
+              { label: 'Accent', keys: ['accent', 'accentForeground'] as (keyof ColorPalette)[] },
+              { label: 'Muted', keys: ['muted', 'mutedForeground'] as (keyof ColorPalette)[] },
+              { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] as (keyof ColorPalette)[] },
+              { label: 'Borders', keys: ['border', 'input', 'ring'] as (keyof ColorPalette)[] },
+            ] as const
+          ).map(({ label, keys }) => (
+            <div key={label} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+              {keys.map((key) => (
+                <Field key={key} label={COLOR_PALETTE_LABELS[key]}>
+                  <ColorInput
+                    value={doc.settings.colorPalette[key]}
+                    onChange={(v) =>
+                      onUpdateSettings({ colorPalette: { ...doc.settings.colorPalette, [key]: v } })
+                    }
+                  />
+                </Field>
+              ))}
+            </div>
+          ))}
+        </InspectorSection>
+
+        <InspectorSection title="Custom Colors">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {doc.settings.customColors.map((cc, idx) => (
+              <div key={cc.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Name</div>
+                  <input
+                    style={{ ...inputStyle, width: '100%' }}
+                    value={cc.label}
+                    onChange={(e) => {
+                      const updated = [...doc.settings.customColors];
+                      updated[idx] = { ...cc, label: e.target.value };
+                      onUpdateSettings({ customColors: updated });
+                    }}
+                    placeholder="Color name"
+                  />
+                </div>
+                <div style={{ width: 80 }}>
+                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Value</div>
+                  <ColorInput
+                    value={cc.value}
+                    onChange={(v) => {
+                      const updated = [...doc.settings.customColors];
+                      updated[idx] = { ...cc, value: v };
+                      onUpdateSettings({ customColors: updated });
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = doc.settings.customColors.filter((_, i) => i !== idx);
+                    onUpdateSettings({ customColors: updated });
+                  }}
+                  title="Remove color"
+                  style={{ width: 28, height: 28, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                const newColor: CustomColor = { id: nextId('cc'), label: 'Custom', value: '#6366f1' };
+                onUpdateSettings({ customColors: [...doc.settings.customColors, newColor] });
+              }}
+              style={{
+                padding: '6px 12px',
+                border: `1px dashed ${C.inspectorBorder}`,
+                borderRadius: 6,
+                background: '#fafafa',
+                color: '#52525b',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Plus size={12} /> Add Custom Color
+            </button>
+          </div>
+        </InspectorSection>
+
+        <InspectorSection title="Layout">
+          <Field label="Background Color">
+            <PaletteColorPicker value={doc.settings.backgroundColor} onChange={(v) => onUpdateSettings({ backgroundColor: v })} />
+          </Field>
+          <Field label="Content Background">
+            <PaletteColorPicker value={doc.settings.contentBackgroundColor} onChange={(v) => onUpdateSettings({ contentBackgroundColor: v })} />
+          </Field>
+          <Field label="Content Width (px)">
+            <NumberInput value={doc.settings.contentWidth} min={320} max={1200} onChange={(v) => onUpdateSettings({ contentWidth: v })} />
+          </Field>
+          <Field label="Content Align">
+            <AlignButtons value={doc.settings.contentAlign} onChange={(v) => onUpdateSettings({ contentAlign: v })} />
+          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            <Field label="Pad Top">
+              <NumberInput value={doc.settings.contentPaddingTop} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingTop: v })} />
+            </Field>
+            <Field label="Pad Right">
+              <NumberInput value={doc.settings.contentPaddingRight} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingRight: v })} />
+            </Field>
+            <Field label="Pad Bottom">
+              <NumberInput value={doc.settings.contentPaddingBottom} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingBottom: v })} />
+            </Field>
+            <Field label="Pad Left">
+              <NumberInput value={doc.settings.contentPaddingLeft} min={0} max={100} onChange={(v) => onUpdateSettings({ contentPaddingLeft: v })} />
+            </Field>
+          </div>
+        </InspectorSection>
+
+        <InspectorSection title="Meta">
+          <Field label="Preheader Text">
+            <textarea
+              style={{ ...textareaStyle, minHeight: 60 }}
+              value={doc.settings.preheaderText}
+              onChange={(e) => onUpdateSettings({ preheaderText: e.target.value })}
+              placeholder="Preview text shown in inbox..."
+            />
+          </Field>
+        </InspectorSection>
+      </div>
+    </div>
+  );
+}
+
 function RightInspector({
   doc,
   selection,
@@ -3903,6 +3911,7 @@ function RightInspector({
   onUpdateSection,
   onDeleteSection,
   onClearSelection,
+  onUpdateSettings,
 }: {
   doc: EmailDocument;
   selection: Selection;
@@ -3911,37 +3920,45 @@ function RightInspector({
   onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
   onDeleteSection: (sId: string) => void;
   onClearSelection: () => void;
+  onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
 }) {
-  if (!selection) return null;
+  let title = 'Body';
+  let content: React.ReactNode = <BodySettingsPanel doc={doc} onUpdateSettings={onUpdateSettings} />;
+  let showBack = false;
 
-  const title = selection.type === 'block' ? 'Edit Block' : 'Edit Row';
-
-  let content: React.ReactNode = null;
-  if (selection.type === 'block') {
-    const block = findBlock(doc, selection.sectionId, selection.columnId, selection.blockId);
-    if (block) {
-      content = (
-        <BlockInspectorPanel
-          block={block}
-          onUpdate={(patch) => onUpdateBlock(selection.sectionId, selection.columnId, selection.blockId, patch)}
-          onDelete={() => onDeleteBlock(selection.sectionId, selection.columnId, selection.blockId)}
-        />
-      );
+  if (selection) {
+    showBack = true;
+    title = selection.type === 'block' ? 'Edit Block' : 'Edit Row';
+    content = null;
+    if (selection.type === 'block') {
+      const block = findBlock(doc, selection.sectionId, selection.columnId, selection.blockId);
+      if (block) {
+        content = (
+          <BlockInspectorPanel
+            block={block}
+            onUpdate={(patch) => onUpdateBlock(selection.sectionId, selection.columnId, selection.blockId, patch)}
+            onDelete={() => onDeleteBlock(selection.sectionId, selection.columnId, selection.blockId)}
+          />
+        );
+      }
+    } else if (selection.type === 'section') {
+      const section = findSection(doc, selection.sectionId);
+      if (section) {
+        content = (
+          <SectionInspectorPanel
+            section={section}
+            onUpdate={(patch) => onUpdateSection(selection.sectionId, patch)}
+            onDelete={() => onDeleteSection(selection.sectionId)}
+          />
+        );
+      }
     }
-  } else if (selection.type === 'section') {
-    const section = findSection(doc, selection.sectionId);
-    if (section) {
-      content = (
-        <SectionInspectorPanel
-          section={section}
-          onUpdate={(patch) => onUpdateSection(selection.sectionId, patch)}
-          onDelete={() => onDeleteSection(selection.sectionId)}
-        />
-      );
+    if (!content) {
+      title = 'Body';
+      content = <BodySettingsPanel doc={doc} onUpdateSettings={onUpdateSettings} />;
+      showBack = false;
     }
   }
-
-  if (!content) return null;
 
   return (
     <div
@@ -3965,25 +3982,27 @@ function RightInspector({
           flexShrink: 0,
         }}
       >
-        <button
-          onClick={onClearSelection}
-          title="Close"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 24,
-            height: 24,
-            border: `1px solid ${C.sidebarBorder}`,
-            borderRadius: 4,
-            background: '#ffffff',
-            color: '#18181b',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <ChevronRight size={12} />
-        </button>
+        {showBack && (
+          <button
+            onClick={onClearSelection}
+            title="Close"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 24,
+              height: 24,
+              border: `1px solid ${C.sidebarBorder}`,
+              borderRadius: 4,
+              background: '#ffffff',
+              color: '#18181b',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <ChevronRight size={12} />
+          </button>
+        )}
         <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: '#09090b' }}>{title}</span>
       </div>
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -4553,7 +4572,7 @@ export function EmailBlockEditor({
           onMoveSectionToIndex={moveSectionToIndex}
           onClearSelection={() => setSelection(null)}
         />
-        {!previewEnabled && selection && (
+        {!previewEnabled && (
           <ResizablePanel defaultWidth={320} minWidth={260} maxWidth={500} side="right">
             <RightInspector
               doc={doc}
@@ -4563,6 +4582,7 @@ export function EmailBlockEditor({
               onUpdateSection={updateSection}
               onDeleteSection={deleteSection}
               onClearSelection={() => setSelection(null)}
+              onUpdateSettings={updateSettings}
             />
           </ResizablePanel>
         )}
