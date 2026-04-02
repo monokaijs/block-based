@@ -1,6 +1,6 @@
 {
   "name": "block-based",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "A composable, block-based UI builder component for React",
   "homepage": "https://blockbased.creaton.dev",
@@ -12,7 +12,14 @@
     "url": "https://github.com/monokaijs/block-based/issues"
   },
   "license": "MIT",
-  "keywords": ["ui", "editor", "block", "react", "block-builder", "drag-and-drop"],
+  "keywords": [
+    "ui",
+    "editor",
+    "block",
+    "react",
+    "block-builder",
+    "drag-and-drop"
+  ],
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
