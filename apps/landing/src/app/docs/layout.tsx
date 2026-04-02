@@ -31,7 +31,9 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           [&_pre]:overflow-x-auto [&_pre]:text-sm [&_pre]:leading-relaxed
           [&_pre>code]:bg-transparent [&_pre>code]:p-0 [&_pre>code]:text-inherit
           [&_[data-rehype-pretty-code-figure]]:my-4
-          [&_[data-rehype-pretty-code-figure]_pre]:bg-[#0d1117]">
+          [&_[data-rehype-pretty-code-figure]_pre]:bg-[#0d1117]
+          prose-table:border-collapse prose-th:border prose-th:border-border prose-th:px-3 prose-th:py-2 prose-th:bg-muted
+          prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-2">
           {children}
         </main>
       </div>

@@ -29,15 +29,23 @@ The generated HTML is designed for broad compatibility:
 
 The renderer processes every part of the document:
 
-| Document Part | HTML Output |
-|---------------|-------------|
-| `settings.backgroundColor` | Outer `<body>` background |
-| `settings.contentBackgroundColor` | Inner container background |
-| `settings.fontFamily` / `fontSize` / `fontWeight` | Applied to the body wrapper |
-| `settings.preheaderText` | Hidden `<div>` at the top of the output |
-| Each `section` | A `<table>` row with section-level padding, background, and borders |
-| Each `column` | A `<td>` within the section's table row |
-| Each `block` | Block-specific HTML (see [Block Types](/docs/blocks)) |
+<table>
+  <thead>
+    <tr>
+      <th>Document Part</th>
+      <th>HTML Output</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>`settings.backgroundColor`</td><td>Outer `<body>` background</td></tr>
+    <tr><td>`settings.contentBackgroundColor`</td><td>Inner container background</td></tr>
+    <tr><td>`settings.fontFamily` / `fontSize` / `fontWeight`</td><td>Applied to the body wrapper</td></tr>
+    <tr><td>`settings.preheaderText`</td><td>Hidden `<div>` at the top of the output</td></tr>
+    <tr><td>Each `section`</td><td>A `<table>` row with section-level padding, background, and borders</td></tr>
+    <tr><td>Each `column`</td><td>A `<td>` within the section's table row</td></tr>
+    <tr><td>Each `block`</td><td>Block-specific HTML (see <a href="/docs/blocks">Block Types</a>)</td></tr>
+  </tbody>
+</table>
 
 ## Using the HTML
 

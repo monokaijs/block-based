@@ -19,16 +19,26 @@ function Editor() {
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `value` | `EmailDocument` | — | The document to edit. If omitted the editor creates its own internal state. |
-| `onChange` | `(doc: EmailDocument) => void` | — | Called whenever the document changes. |
-| `height` | `string \| number` | `"100%"` | CSS height of the editor container. |
-| `defaultPalette` | `Partial<ColorPalette>` | — | Override the default color palette tokens. |
-| `sampleBlocks` | `SampleBlock[]` | — | Extra blocks shown in the sidebar's Content tab. |
-| `templates` | `TemplateDefinition[]` | — | Extra section templates shown in the Templates tab. |
-| `customTabs` | `CustomTab[]` | — | Additional sidebar tabs with custom rendering. |
-| `features` | `Partial<EditorFeatures>` | all `true` | Enable / disable specific editor capabilities. |
+<table>
+  <thead>
+    <tr>
+      <th>Prop</th>
+      <th>Type</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>`value`</td><td>`EmailDocument`</td><td>—</td><td>The document to edit. If omitted the editor creates its own internal state.</td></tr>
+    <tr><td>`onChange`</td><td>`(doc: EmailDocument) => void`</td><td>—</td><td>Called whenever the document changes.</td></tr>
+    <tr><td>`height`</td><td>`string | number`</td><td>`"100%"`</td><td>CSS height of the editor container.</td></tr>
+    <tr><td>`defaultPalette`</td><td>`Partial<ColorPalette>`</td><td>—</td><td>Override the default color palette tokens.</td></tr>
+    <tr><td>`sampleBlocks`</td><td>`SampleBlock[]`</td><td>—</td><td>Extra blocks shown in the sidebar's Content tab.</td></tr>
+    <tr><td>`templates`</td><td>`TemplateDefinition[]`</td><td>—</td><td>Extra section templates shown in the Templates tab.</td></tr>
+    <tr><td>`customTabs`</td><td>`CustomTab[]`</td><td>—</td><td>Additional sidebar tabs with custom rendering.</td></tr>
+    <tr><td>`features`</td><td>`Partial<EditorFeatures>`</td><td>all `true`</td><td>Enable / disable specific editor capabilities.</td></tr>
+  </tbody>
+</table>
 
 ## Controlling the Editor
 
