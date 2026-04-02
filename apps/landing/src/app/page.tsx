@@ -6,8 +6,8 @@ import {
   Blocks,
   Code2,
   Columns3,
+  FileCode,
   GripVertical,
-  Mail,
   MousePointerClick,
   Package,
   Rocket,
@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: Blocks,
     title: "Block-based editing",
-    desc: "Build emails from composable blocks — headings, paragraphs, buttons, images, menus, dividers, spacers, and raw HTML.",
+    desc: "Build UIs from composable blocks — headings, paragraphs, buttons, images, menus, dividers, spacers, and raw HTML.",
   },
   {
     icon: MousePointerClick,
@@ -37,9 +37,9 @@ const FEATURES = [
     desc: "Arrange blocks in 1–4 column grids with flexible width ratios. Drag to reorder sections and blocks.",
   },
   {
-    icon: Mail,
-    title: "Email-safe HTML output",
-    desc: "Renders table-based, client-compatible HTML that displays correctly across all major email clients.",
+    icon: FileCode,
+    title: "Clean HTML output",
+    desc: "Renders clean, production-ready HTML from your block layout — ready for any platform or use case.",
   },
   {
     icon: GripVertical,
@@ -84,13 +84,13 @@ export default function Home() {
         </Badge>
 
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight max-w-3xl leading-[1.08]">
-          Email block editor for{" "}
+          UI block builder for{" "}
           <span className="text-primary">React</span>
         </h1>
 
         <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-          A composable email builder component. Design beautiful, email-client-safe
-          HTML emails visually — then export with one function call.
+          A composable UI builder component. Design beautiful block-based
+          layouts visually — then export HTML with one function call.
         </p>
 
         <div className="flex flex-wrap gap-3 justify-center pt-2">
@@ -125,7 +125,7 @@ export default function Home() {
               Everything you need
             </h2>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              A full-featured email editor in a single React component.
+              A full-featured UI block builder in a single React component.
             </p>
           </div>
 

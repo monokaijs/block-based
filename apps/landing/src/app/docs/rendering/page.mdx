@@ -1,6 +1,6 @@
 # Rendering HTML
 
-Use `renderEmailDocument()` to convert a document into table-based, email-client-safe HTML.
+Use `renderEmailDocument()` to convert a document into clean, production-ready HTML.
 
 ## Basic Usage
 
@@ -8,19 +8,19 @@ Use `renderEmailDocument()` to convert a document into table-based, email-client
 import { renderEmailDocument } from 'block-based';
 import type { EmailDocument } from 'block-based';
 
-function exportEmail(doc: EmailDocument) {
+function exportDoc(doc: EmailDocument) {
   const html = renderEmailDocument(doc);
-  // Send via your email API, save to file, or preview in an iframe
+  // Save to file, render in an iframe, or use anywhere
   return html;
 }
 ```
 
 ## Output Characteristics
 
-The generated HTML is designed for maximum email client compatibility:
+The generated HTML is designed for broad compatibility:
 
-- **Table-based layout** — uses `<table>`, `<tr>`, `<td>` for structure (not flexbox/grid)
-- **Inline styles** — all styling is inlined for clients that strip `<style>` tags
+- **Table-based layout** — uses `<table>`, `<tr>`, `<td>` for structure
+- **Inline styles** — all styling is inlined for maximum portability
 - **Multi-column support** — columns rendered as table cells with percentage widths
 - **Preheader text** — hidden preview text included when `settings.preheaderText` is set
 - **Responsive width** — content container respects `settings.contentWidth` (default: 640px)
@@ -34,17 +34,17 @@ The renderer processes every part of the document:
 | `settings.backgroundColor` | Outer `<body>` background |
 | `settings.contentBackgroundColor` | Inner container background |
 | `settings.fontFamily` / `fontSize` / `fontWeight` | Applied to the body wrapper |
-| `settings.preheaderText` | Hidden `<div>` at the top of the email |
+| `settings.preheaderText` | Hidden `<div>` at the top of the output |
 | Each `section` | A `<table>` row with section-level padding, background, and borders |
 | Each `column` | A `<td>` within the section's table row |
 | Each `block` | Block-specific HTML (see [Block Types](/docs/blocks)) |
 
-## Sending Emails
+## Using the HTML
 
-The HTML string can be used with any email sending service:
+The HTML string can be used anywhere — emails, web pages, previews:
 
 ```tsx
-// Example with a generic email API
+// Example: sending as an email
 const html = renderEmailDocument(doc);
 
 await sendEmail({
@@ -64,7 +64,7 @@ function Preview({ doc }: { doc: EmailDocument }) {
     <iframe
       srcDoc={html}
       style={{ width: '100%', height: 600, border: 'none' }}
-      title="Email preview"
+      title="Preview"
     />
   );
 }

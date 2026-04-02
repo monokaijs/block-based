@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Block Based — Email Block Editor for React",
+  title: "Block Based — UI Block Builder for React",
   description:
-    "A composable, block-based email editor component for React. Design beautiful, email-client-safe HTML emails visually.",
+    "A composable, block-based UI builder component for React. Design beautiful layouts visually and export HTML.",
 };
 
 export default function RootLayout({
