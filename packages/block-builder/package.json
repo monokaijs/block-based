@@ -1,6 +1,6 @@
 {
   "name": "block-based",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "private": false,
   "description": "A composable, block-based UI builder component for React",
   "homepage": "https://blockbased.creaton.dev",
