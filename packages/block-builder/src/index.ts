@@ -22,6 +22,7 @@ export type {
   CustomTab,
   CustomTabContext,
   EditorFeatures,
+  EditorThemeMode,
 } from './types';
 
 export {

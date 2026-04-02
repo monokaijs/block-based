@@ -78,6 +78,7 @@ import type {
   TemplateDefinition,
   CustomTab,
   EditorFeatures,
+  EditorThemeMode,
 } from './types';
 import { COLOR_PALETTE_KEYS, COLOR_PALETTE_LABELS, DEFAULT_COLOR_PALETTE } from './types';
 import { createBlock } from './blocks';
@@ -86,27 +87,110 @@ import { createSectionTemplate, normalizeSection } from './section';
 import { renderEmailDocument } from './render';
 import { nextId } from './utils';
 
-// ─── Colour tokens ───────────────────────────────────────────────────────────
+// ─── Theme tokens ────────────────────────────────────────────────────────────
 
-const C = {
-  sidebarBg: '#ffffff',
-  sidebarText: '#18181b',
-  sidebarMuted: '#71717a',
-  sidebarBorder: '#e4e4e7',
-  sidebarHover: '#f4f4f5',
-  tabActive: '#f4f4f5',
+type ThemeTokens = {
+  // Surfaces
+  bg: string;
+  bgSubtle: string;
+  bgMuted: string;
+  bgHover: string;
+  bgAccentSubtle: string;
+  canvasBg: string;
+  // Text
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  textFaint: string;
+  textOnAccent: string;
+  // Borders
+  border: string;
+  borderSubtle: string;
+  // Accent
+  accent: string;
+  accentHover: string;
+  accentBg: string;
+  // Danger
+  danger: string;
+  dangerHover: string;
+  dangerBg: string;
+  // Block interactions
+  blockHover: string;
+  blockSelected: string;
+  sectionHover: string;
+  // Dialog
+  dialogOverlay: string;
+  dialogShadow: string;
+  // Scrollbar (for custom scrollbars if needed)
+  scrollbarThumb: string;
+};
+
+const LIGHT_THEME: ThemeTokens = {
+  bg: '#ffffff',
+  bgSubtle: '#fafafa',
+  bgMuted: '#f4f4f5',
+  bgHover: '#f4f4f5',
+  bgAccentSubtle: '#f8faff',
   canvasBg: '#d4d4d8',
-  inspectorBg: '#ffffff',
-  inspectorBorder: '#e4e4e7',
-  inspectorMuted: '#71717a',
+  text: '#18181b',
+  textSecondary: '#52525b',
+  textMuted: '#71717a',
+  textFaint: '#a1a1aa',
+  textOnAccent: '#ffffff',
+  border: '#e4e4e7',
+  borderSubtle: '#e5e7eb',
   accent: '#2563eb',
   accentHover: '#1d4ed8',
+  accentBg: '#dbeafe',
   danger: '#dc2626',
   dangerHover: '#b91c1c',
+  dangerBg: '#fef2f2',
   blockHover: 'rgba(37,99,235,0.08)',
   blockSelected: '#2563eb',
   sectionHover: 'rgba(37,99,235,0.05)',
+  dialogOverlay: 'rgba(0,0,0,0.4)',
+  dialogShadow: '0 20px 60px rgba(0,0,0,.2)',
+  scrollbarThumb: '#d4d4d8',
 };
+
+const DARK_THEME: ThemeTokens = {
+  bg: '#09090b',
+  bgSubtle: '#18181b',
+  bgMuted: '#27272a',
+  bgHover: '#27272a',
+  bgAccentSubtle: '#0f172a',
+  canvasBg: '#18181b',
+  text: '#fafafa',
+  textSecondary: '#a1a1aa',
+  textMuted: '#71717a',
+  textFaint: '#52525b',
+  textOnAccent: '#ffffff',
+  border: '#27272a',
+  borderSubtle: '#3f3f46',
+  accent: '#3b82f6',
+  accentHover: '#60a5fa',
+  accentBg: '#172554',
+  danger: '#f87171',
+  dangerHover: '#fca5a5',
+  dangerBg: '#450a0a',
+  blockHover: 'rgba(59,130,246,0.12)',
+  blockSelected: '#3b82f6',
+  sectionHover: 'rgba(59,130,246,0.08)',
+  dialogOverlay: 'rgba(0,0,0,0.6)',
+  dialogShadow: '0 20px 60px rgba(0,0,0,.5)',
+  scrollbarThumb: '#3f3f46',
+};
+
+function getTheme(mode: EditorThemeMode): ThemeTokens {
+  return mode === 'dark' ? DARK_THEME : LIGHT_THEME;
+}
+
+const ThemeContext = React.createContext<ThemeTokens>(LIGHT_THEME);
+
+function useT(): ThemeTokens {
+  return React.useContext(ThemeContext);
+}
+
 
 // ─── Internal types ───────────────────────────────────────────────────────────
 
@@ -133,6 +217,9 @@ export interface EmailBlockEditorProps {
   value?: EmailDocument;
   onChange?: (doc: EmailDocument) => void;
   height?: string | number;
+
+  /** Editor UI theme. Defaults to 'light'. */
+  theme?: EditorThemeMode;
 
   /** Override default color palette values. */
   defaultPalette?: Partial<ColorPalette>;
@@ -251,9 +338,10 @@ function applyRowLayout(section: EmailSection, widths: number[]): EmailSection {
 // ─── UI atoms ─────────────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const C = useT();
   return (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.inspectorMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </div>
       {children}
@@ -261,27 +349,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '5px 7px',
-  border: `1px solid ${C.inspectorBorder}`,
-  borderRadius: 6,
-  fontSize: 12,
-  background: '#fafafa',
-  color: '#18181b',
-  outline: 'none',
-};
+function inputStyle(C: ThemeTokens): React.CSSProperties {
+  return {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '5px 7px',
+    border: `1px solid ${C.border}`,
+    borderRadius: 6,
+    fontSize: 12,
+    background: C.bgSubtle,
+    color: C.text,
+    outline: 'none',
+  };
+}
 
-const textareaStyle: React.CSSProperties = {
-  ...inputStyle,
-  minHeight: 100,
-  resize: 'vertical',
-  fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-};
+function textareaStyle(C: ThemeTokens): React.CSSProperties {
+  return {
+    ...inputStyle(C),
+    minHeight: 100,
+    resize: 'vertical',
+    fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+  };
+}
 
 function TextInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return <input style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)} />;
+  const C = useT();
+  return <input style={inputStyle(C)} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function SelectInput({
@@ -293,9 +386,10 @@ function SelectInput({
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
+  const C = useT();
   return (
     <select
-      style={{ ...inputStyle, appearance: 'none', cursor: 'pointer' }}
+      style={{ ...inputStyle(C), appearance: 'none', cursor: 'pointer' }}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
@@ -309,6 +403,7 @@ function SelectInput({
 }
 
 function NumberInput({ value, onChange, min, max }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+  const C = useT();
   const holdTimeoutRef = useRef<number | null>(null);
   const holdIntervalRef = useRef<number | null>(null);
   const valueRef = useRef(value);
@@ -361,7 +456,7 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
     <div style={{ position: 'relative' }}>
       <input
         type="number"
-        style={{ ...inputStyle, width: '100%', paddingRight: 40 }}
+        style={{ ...inputStyle(C), width: '100%', paddingRight: 40 }}
         value={value}
         min={min}
         max={max}
@@ -379,10 +474,10 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
           onPointerCancel={stopHold}
           style={{
             width: 20,
-            border: `1px solid ${C.inspectorBorder}`,
+            border: `1px solid ${C.border}`,
             borderRadius: 4,
-            background: '#f4f4f5',
-            color: '#52525b',
+            background: C.bgMuted,
+            color: C.textSecondary,
             cursor: 'pointer',
             fontSize: 12,
             lineHeight: '12px',
@@ -403,10 +498,10 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
           onPointerCancel={stopHold}
           style={{
             width: 20,
-            border: `1px solid ${C.inspectorBorder}`,
+            border: `1px solid ${C.border}`,
             borderRadius: 4,
-            background: '#f4f4f5',
-            color: '#52525b',
+            background: C.bgMuted,
+            color: C.textSecondary,
             cursor: 'pointer',
             fontSize: 12,
             lineHeight: '12px',
@@ -422,10 +517,11 @@ function NumberInput({ value, onChange, min, max }: { value: number; onChange: (
 }
 
 function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const C = useT();
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: 32, height: 32, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 2, background: 'none' }} />
-      <input style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: 32, height: 32, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer', padding: 2, background: 'none' }} />
+      <input style={{ ...inputStyle(C), flex: 1, fontFamily: 'monospace' }} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -444,6 +540,7 @@ function PaletteColorPicker({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const C = useT();
   const { palette, customColors } = React.useContext(PaletteContext);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -479,7 +576,7 @@ function PaletteColorPicker({
             width: 32,
             height: 32,
             borderRadius: 6,
-            border: `1px solid ${C.inspectorBorder}`,
+            border: `1px solid ${C.border}`,
             background: value,
             cursor: 'pointer',
             flexShrink: 0,
@@ -487,7 +584,7 @@ function PaletteColorPicker({
           }}
         />
         <input
-          style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+          style={{ ...inputStyle(C), flex: 1, fontFamily: 'monospace' }}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -508,8 +605,8 @@ function PaletteColorPicker({
             right: 0,
             zIndex: 200,
             marginTop: 4,
-            background: '#ffffff',
-            border: `1px solid ${C.inspectorBorder}`,
+            background: C.bg,
+            border: `1px solid ${C.border}`,
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0,0,0,.15)',
             padding: 8,
@@ -519,7 +616,7 @@ function PaletteColorPicker({
         >
           {paletteGroups.map(({ label, keys }) => (
             <div key={label} style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
                 {label}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -535,7 +632,7 @@ function PaletteColorPicker({
                         width: 24,
                         height: 24,
                         borderRadius: 4,
-                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.inspectorBorder}`,
+                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
                         background: color,
                         cursor: 'pointer',
                         padding: 0,
@@ -550,7 +647,7 @@ function PaletteColorPicker({
 
           {customColors.length > 0 && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 4px' }}>
                 Custom
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -565,7 +662,7 @@ function PaletteColorPicker({
                         width: 24,
                         height: 24,
                         borderRadius: 4,
-                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.inspectorBorder}`,
+                        border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
                         background: cc.value,
                         cursor: 'pointer',
                         padding: 0,
@@ -578,15 +675,15 @@ function PaletteColorPicker({
             </div>
           )}
 
-          <div style={{ borderTop: `1px solid ${C.inspectorBorder}`, paddingTop: 6, marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 6, marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
             <input
               type="color"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none' }}
+              style={{ width: 24, height: 24, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none' }}
             />
             <input
-              style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+              style={{ ...inputStyle(C), flex: 1, fontFamily: 'monospace', fontSize: 11 }}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') setOpen(false); }}
@@ -608,6 +705,7 @@ function ColorPaletteSection({
   doc: EmailDocument;
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
 }) {
+  const C = useT();
   const [dialogOpen, setDialogOpen] = useState(false);
   const allColors = [
     ...COLOR_PALETTE_KEYS.map((k) => doc.settings.colorPalette[k]),
@@ -625,10 +723,10 @@ function ColorPaletteSection({
           onClick={() => setDialogOpen(true)}
           style={{
             padding: '3px 8px',
-            border: `1px solid ${C.inspectorBorder}`,
+            border: `1px solid ${C.border}`,
             borderRadius: 5,
-            background: '#fafafa',
-            color: '#52525b',
+            background: C.bgSubtle,
+            color: C.textSecondary,
             cursor: 'pointer',
             fontSize: 11,
             fontWeight: 500,
@@ -650,7 +748,7 @@ function ColorPaletteSection({
               height: 24,
               borderRadius: 5,
               background: color,
-              border: `1px solid ${C.inspectorBorder}`,
+              border: `1px solid ${C.border}`,
               cursor: 'pointer',
             }}
             title={color}
@@ -664,14 +762,14 @@ function ColorPaletteSection({
               width: 24,
               height: 24,
               borderRadius: 5,
-              border: `1px solid ${C.inspectorBorder}`,
-              background: '#f4f4f5',
+              border: `1px solid ${C.border}`,
+              background: C.bgMuted,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 9,
               fontWeight: 700,
-              color: '#71717a',
+              color: C.textMuted,
               cursor: 'pointer',
             }}
           >
@@ -716,6 +814,7 @@ function ColorPaletteDialog({
   onUpdateCustomColors: (colors: CustomColor[]) => void;
   onClose: () => void;
 }) {
+  const C = useT();
   const [search, setSearch] = useState('');
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -751,7 +850,7 @@ function ColorPaletteDialog({
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(0,0,0,0.4)',
+        background: C.dialogOverlay,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -762,21 +861,21 @@ function ColorPaletteDialog({
         style={{
           width: 520,
           maxHeight: '80vh',
-          background: '#ffffff',
+          background: C.bg,
           borderRadius: 12,
-          boxShadow: '0 20px 60px rgba(0,0,0,.2)',
+          boxShadow: C.dialogShadow,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: `1px solid ${C.inspectorBorder}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}>
           <Paintbrush size={18} style={{ color: C.accent }} />
-          <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#18181b' }}>Color Palette</div>
+          <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: C.text }}>Color Palette</div>
           <button
             onClick={onClose}
-            style={{ width: 28, height: 28, border: 'none', borderRadius: 6, background: '#f4f4f5', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 28, height: 28, border: 'none', borderRadius: 6, background: C.bgMuted, color: C.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <X size={14} />
           </button>
@@ -784,9 +883,9 @@ function ColorPaletteDialog({
 
         {/* Search */}
         <div style={{ padding: '12px 20px 8px', position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: 32, top: 23, color: '#a1a1aa', pointerEvents: 'none' }} />
+          <Search size={14} style={{ position: 'absolute', left: 32, top: 23, color: C.textFaint, pointerEvents: 'none' }} />
           <input
-            style={{ ...inputStyle, paddingLeft: 30, width: '100%', fontSize: 13 }}
+            style={{ ...inputStyle(C), paddingLeft: 30, width: '100%', fontSize: 13 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search colors..."
@@ -798,7 +897,7 @@ function ColorPaletteDialog({
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px' }}>
           {filteredGroups.map(({ label, keys }) => (
             <div key={label} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                 {label}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>
@@ -815,8 +914,8 @@ function ColorPaletteDialog({
                       style={{
                         position: 'relative',
                         borderRadius: 8,
-                        border: `1px solid ${isHovered ? C.accent : C.inspectorBorder}`,
-                        background: isHovered ? '#f8faff' : '#fafafa',
+                        border: `1px solid ${isHovered ? C.accent : C.border}`,
+                        background: isHovered ? C.bgAccentSubtle : C.bgSubtle,
                         padding: 8,
                         cursor: 'pointer',
                         transition: 'all 0.15s',
@@ -828,13 +927,13 @@ function ColorPaletteDialog({
                         height: 32,
                         borderRadius: 5,
                         background: color,
-                        border: `1px solid ${C.inspectorBorder}`,
+                        border: `1px solid ${C.border}`,
                         marginBottom: 6,
                       }} />
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#18181b', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.text, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {name}
                       </div>
-                      <div style={{ fontSize: 10, color: '#a1a1aa', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: 10, color: C.textFaint, fontFamily: 'monospace' }}>
                         {color}
                       </div>
                       {isEditing && (
@@ -843,10 +942,10 @@ function ColorPaletteDialog({
                             type="color"
                             value={color}
                             onChange={(e) => onUpdatePalette({ ...palette, [key]: e.target.value })}
-                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
+                            style={{ width: 24, height: 24, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
                           />
                           <input
-                            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+                            style={{ ...inputStyle(C), flex: 1, fontFamily: 'monospace', fontSize: 11 }}
                             value={color}
                             onChange={(e) => onUpdatePalette({ ...palette, [key]: e.target.value })}
                           />
@@ -862,7 +961,7 @@ function ColorPaletteDialog({
           {/* Custom Colors */}
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Custom Colors
               </div>
               <button
@@ -872,10 +971,10 @@ function ColorPaletteDialog({
                 }}
                 style={{
                   padding: '3px 8px',
-                  border: `1px solid ${C.inspectorBorder}`,
+                  border: `1px solid ${C.border}`,
                   borderRadius: 5,
-                  background: '#fafafa',
-                  color: '#52525b',
+                  background: C.bgSubtle,
+                  color: C.textSecondary,
                   cursor: 'pointer',
                   fontSize: 11,
                   fontWeight: 500,
@@ -888,12 +987,12 @@ function ColorPaletteDialog({
               </button>
             </div>
             {filteredCustom.length === 0 && customColors.length === 0 && (
-              <div style={{ fontSize: 12, color: '#a1a1aa', padding: '12px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: C.textFaint, padding: '12px 0', textAlign: 'center' }}>
                 No custom colors yet. Add one to get started.
               </div>
             )}
             {filteredCustom.length === 0 && customColors.length > 0 && query && (
-              <div style={{ fontSize: 12, color: '#a1a1aa', padding: '12px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: C.textFaint, padding: '12px 0', textAlign: 'center' }}>
                 No matching custom colors.
               </div>
             )}
@@ -910,8 +1009,8 @@ function ColorPaletteDialog({
                     style={{
                       position: 'relative',
                       borderRadius: 8,
-                      border: `1px solid ${isHovered ? C.accent : C.inspectorBorder}`,
-                      background: isHovered ? '#f8faff' : '#fafafa',
+                      border: `1px solid ${isHovered ? C.accent : C.border}`,
+                      background: isHovered ? C.bgAccentSubtle : C.bgSubtle,
                       padding: 8,
                       cursor: 'pointer',
                       transition: 'all 0.15s',
@@ -923,19 +1022,19 @@ function ColorPaletteDialog({
                       height: 32,
                       borderRadius: 5,
                       background: cc.value,
-                      border: `1px solid ${C.inspectorBorder}`,
+                      border: `1px solid ${C.border}`,
                       marginBottom: 6,
                     }} />
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#18181b', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: C.text, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {cc.label}
                     </div>
-                    <div style={{ fontSize: 10, color: '#a1a1aa', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: 10, color: C.textFaint, fontFamily: 'monospace' }}>
                       {cc.value}
                     </div>
                     {isEditing && (
                       <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }} onClick={(e) => e.stopPropagation()}>
                         <input
-                          style={{ ...inputStyle, fontSize: 11 }}
+                          style={{ ...inputStyle(C), fontSize: 11 }}
                           value={cc.label}
                           onChange={(e) => {
                             const updated = [...customColors];
@@ -953,10 +1052,10 @@ function ColorPaletteDialog({
                               updated[realIdx] = { ...cc, value: e.target.value };
                               onUpdateCustomColors(updated);
                             }}
-                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
+                            style={{ width: 24, height: 24, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
                           />
                           <input
-                            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+                            style={{ ...inputStyle(C), flex: 1, fontFamily: 'monospace', fontSize: 11 }}
                             value={cc.value}
                             onChange={(e) => {
                               const updated = [...customColors];
@@ -971,7 +1070,7 @@ function ColorPaletteDialog({
                               setEditingKey(null);
                             }}
                             title="Remove"
-                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}
+                            style={{ width: 24, height: 24, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg, color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}
                           >
                             <Trash2 size={11} />
                           </button>
@@ -990,6 +1089,7 @@ function ColorPaletteDialog({
 }
 
 function AlignButtons({ value, onChange }: { value?: string; onChange: (v: 'left' | 'center' | 'right') => void }) {
+  const C = useT();
   const opts: Array<{ v: 'left' | 'center' | 'right'; Icon: React.FC<LucideProps> }> = [
     { v: 'left', Icon: AlignLeft },
     { v: 'center', Icon: AlignCenter },
@@ -1007,10 +1107,10 @@ function AlignButtons({ value, onChange }: { value?: string; onChange: (v: 'left
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: `1px solid ${value === v ? C.accent : C.inspectorBorder}`,
+            border: `1px solid ${value === v ? C.accent : C.border}`,
             borderRadius: 5,
-            background: value === v ? C.accent : '#fafafa',
-            color: value === v ? '#fff' : '#71717a',
+            background: value === v ? C.accent : C.bgSubtle,
+            color: value === v ? C.textOnAccent : C.textMuted,
             cursor: 'pointer',
           }}
           title={v}
@@ -1075,6 +1175,7 @@ function PaddingControls({
   mode: PaddingMode;
   onChange: (patch: PaddingPatch) => void;
 }) {
+  const C = useT();
   const top = kind === 'padding' ? value.paddingTop ?? 0 : value.marginTop ?? 0;
   const right = kind === 'padding' ? value.paddingRight ?? 0 : value.marginRight ?? 0;
   const bottom = kind === 'padding' ? value.paddingBottom ?? 0 : value.marginBottom ?? 0;
@@ -1126,7 +1227,7 @@ function PaddingControls({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
           <Field label="Top">
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.inspectorMuted }}>
+              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textMuted }}>
                 <ArrowUp size={12} />
               </div>
               <div style={{ flex: 1 }}>
@@ -1140,7 +1241,7 @@ function PaddingControls({
           </Field>
           <Field label="Right">
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.inspectorMuted }}>
+              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textMuted }}>
                 <ArrowRight size={12} />
               </div>
               <div style={{ flex: 1 }}>
@@ -1154,7 +1255,7 @@ function PaddingControls({
           </Field>
           <Field label="Bottom">
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.inspectorMuted }}>
+              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textMuted }}>
                 <ArrowDown size={12} />
               </div>
               <div style={{ flex: 1 }}>
@@ -1168,7 +1269,7 @@ function PaddingControls({
           </Field>
           <Field label="Left">
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.inspectorMuted }}>
+              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textMuted }}>
                 <ArrowLeft size={12} />
               </div>
               <div style={{ flex: 1 }}>
@@ -1195,10 +1296,11 @@ function InspectorSection({
   rightSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const C = useT();
   return (
-    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}` }}>
+    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.inspectorMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
         {rightSlot}
       </div>
       {children}
@@ -1213,8 +1315,9 @@ function PaddingModeToggle({
   mode: PaddingMode;
   onChange: (mode: PaddingMode) => void;
 }) {
+  const C = useT();
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 999, border: `1px solid ${C.inspectorBorder}`, background: '#fafafa' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 999, border: `1px solid ${C.border}`, background: C.bgSubtle }}>
       <button
         onClick={() => onChange('basic')}
         style={{
@@ -1226,7 +1329,7 @@ function PaddingModeToggle({
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
           background: mode === 'basic' ? C.accent : 'transparent',
-          color: mode === 'basic' ? '#fff' : '#71717a',
+          color: mode === 'basic' ? C.textOnAccent : C.textMuted,
           cursor: 'pointer',
         }}
       >
@@ -1243,7 +1346,7 @@ function PaddingModeToggle({
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
           background: mode === 'advanced' ? C.accent : 'transparent',
-          color: mode === 'advanced' ? '#fff' : '#71717a',
+          color: mode === 'advanced' ? C.textOnAccent : C.textMuted,
           cursor: 'pointer',
         }}
       >
@@ -1260,6 +1363,7 @@ function SpacingSection({
   value: PaddingValue;
   onChange: (patch: PaddingPatch) => void;
 }) {
+  const C = useT();
   const [mode, setMode] = useState<PaddingMode>(() => {
     const vertical = value.paddingTop ?? 0;
     const horizontal = value.paddingLeft ?? 0;
@@ -1275,12 +1379,12 @@ function SpacingSection({
       rightSlot={<PaddingModeToggle mode={mode} onChange={setMode} />}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ border: `1px solid ${C.inspectorBorder}`, borderRadius: 8, padding: 8, background: '#fafafa' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.inspectorMuted, marginBottom: 6 }}>Padding</div>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 8, background: C.bgSubtle }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 6 }}>Padding</div>
           <PaddingControls value={value} kind="padding" mode={mode} onChange={onChange} />
         </div>
-        <div style={{ border: `1px solid ${C.inspectorBorder}`, borderRadius: 8, padding: 8, background: '#fafafa' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.inspectorMuted, marginBottom: 6 }}>Margin</div>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: 8, background: C.bgSubtle }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 6 }}>Margin</div>
           <PaddingControls value={value} kind="margin" mode={mode} onChange={onChange} />
         </div>
       </div>
@@ -1374,6 +1478,7 @@ function BorderSection({
 }
 
 function DangerButton({ label, onClick }: { label: string; onClick: () => void }) {
+  const C = useT();
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -1386,7 +1491,7 @@ function DangerButton({ label, onClick }: { label: string; onClick: () => void }
         border: `1px solid ${hover ? C.dangerHover : C.danger}`,
         borderRadius: 6,
         background: hover ? C.dangerHover : 'transparent',
-        color: hover ? '#fff' : C.danger,
+        color: hover ? C.textOnAccent : C.danger,
         cursor: 'pointer',
         fontSize: 13,
         fontWeight: 500,
@@ -1441,11 +1546,12 @@ function HeadingInspector({ block, onUpdate }: { block: Extract<EmailBlock, { ty
 }
 
 function ParagraphInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type: 'paragraph' }>; onUpdate: (patch: Partial<typeof block>) => void }) {
+  const C = useT();
   return (
     <>
       <InspectorSection title="Content">
         <Field label="Text">
-          <textarea style={textareaStyle} value={block.content} onChange={(e) => onUpdate({ content: e.target.value })} />
+          <textarea style={textareaStyle(C)} value={block.content} onChange={(e) => onUpdate({ content: e.target.value })} />
         </Field>
         <Field label="Font Size"><NumberInput value={block.fontSize ?? 16} min={8} max={48} onChange={(v) => onUpdate({ fontSize: v })} /></Field>
         <Field label="Color"><PaletteColorPicker value={block.color ?? '#4b5563'} onChange={(v) => onUpdate({ color: v })} /></Field>
@@ -1566,6 +1672,7 @@ function SpacerInspector({ block, onUpdate }: { block: Extract<EmailBlock, { typ
 }
 
 function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type: 'menu' }>; onUpdate: (patch: Partial<typeof block>) => void }) {
+  const C = useT();
   const updateItem = (index: number, patch: Partial<MenuItem>) => {
     const items = block.items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item));
     onUpdate({ items });
@@ -1585,7 +1692,7 @@ function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type:
       <InspectorSection title="Menu Items">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {block.items.map((item, index) => (
-            <div key={index} style={{ border: `1px solid ${C.inspectorBorder}`, borderRadius: 6, padding: 8, background: '#fafafa' }}>
+            <div key={index} style={{ border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, background: C.bgSubtle }}>
               <Field label={`Label ${index + 1}`}>
                 <TextInput value={item.label} onChange={(v) => updateItem(index, { label: v })} />
               </Field>
@@ -1598,10 +1705,10 @@ function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type:
                   marginTop: 4,
                   width: '100%',
                   padding: '6px 8px',
-                  border: `1px solid ${C.inspectorBorder}`,
+                  border: `1px solid ${C.border}`,
                   borderRadius: 6,
-                  background: '#ffffff',
-                  color: '#52525b',
+                  background: C.bg,
+                  color: C.textSecondary,
                   fontSize: 12,
                   cursor: 'pointer',
                 }}
@@ -1615,10 +1722,10 @@ function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type:
             style={{
               width: '100%',
               padding: '7px 8px',
-              border: `1px dashed ${C.inspectorBorder}`,
+              border: `1px dashed ${C.border}`,
               borderRadius: 6,
-              background: '#ffffff',
-              color: '#52525b',
+              background: C.bg,
+              color: C.textSecondary,
               fontSize: 12,
               cursor: 'pointer',
             }}
@@ -1641,11 +1748,12 @@ function MenuInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type:
 }
 
 function HtmlInspector({ block, onUpdate }: { block: Extract<EmailBlock, { type: 'html' }>; onUpdate: (patch: Partial<typeof block>) => void }) {
+  const C = useT();
   return (
     <>
       <InspectorSection title="Content">
         <Field label="HTML">
-          <textarea style={textareaStyle} value={block.content} onChange={(e) => onUpdate({ content: e.target.value })} />
+          <textarea style={textareaStyle(C)} value={block.content} onChange={(e) => onUpdate({ content: e.target.value })} />
         </Field>
       </InspectorSection>
       <SpacingSection value={block} onChange={onUpdate} />
@@ -1666,6 +1774,7 @@ function BlockInspectorPanel({
   onDelete: () => void;
   onClose?: () => void;
 }) {
+  const C = useT();
   const label: Record<EmailBlockType, string> = {
     heading: 'Heading',
     paragraph: 'Paragraph',
@@ -1679,10 +1788,10 @@ function BlockInspectorPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13, color: '#18181b', display: 'flex', alignItems: 'center' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, fontWeight: 600, fontSize: 13, color: C.text, display: 'flex', alignItems: 'center' }}>
         <span style={{ flex: 1 }}>{label[block.type]} Block</span>
         {onClose && (
-          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: '#71717a', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg, color: C.textMuted, cursor: 'pointer', flexShrink: 0 }}>
             <X size={12} />
           </button>
         )}
@@ -1697,7 +1806,7 @@ function BlockInspectorPanel({
         {block.type === 'menu' && <MenuInspector block={block} onUpdate={onUpdate as any} />}
         {block.type === 'html' && <HtmlInspector block={block} onUpdate={onUpdate as any} />}
       </div>
-      <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.inspectorBorder}` }}>
+      <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
         <DangerButton label="Delete Block" onClick={onDelete} />
       </div>
     </div>
@@ -1715,14 +1824,15 @@ function SectionInspectorPanel({
   onDelete: () => void;
   onClose?: () => void;
 }) {
+  const C = useT();
   const currentLayout = section.columns.map((column) => Math.round(column.width));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
         <span style={{ flex: 1 }}>Row</span>
         {onClose && (
-          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: '#71717a', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg, color: C.textMuted, cursor: 'pointer', flexShrink: 0 }}>
             <X size={12} />
           </button>
         )}
@@ -1739,16 +1849,16 @@ function SectionInspectorPanel({
                   title={option.label}
                   style={{
                     padding: '7px',
-                    border: `1px solid ${active ? C.accent : C.inspectorBorder}`,
+                    border: `1px solid ${active ? C.accent : C.border}`,
                     borderRadius: 6,
-                    background: active ? `${C.accent}0d` : '#fafafa',
+                    background: active ? `${C.accent}0d` : C.bgSubtle,
                     cursor: 'pointer',
                     height: 56,
                   }}
                 >
-                  <div style={{ width: '100%', height: '100%', display: 'grid', gridTemplateColumns: option.widths.map((width) => `${width}fr`).join(' '), border: `1px solid ${active ? '#93c5fd' : '#d4d4d8'}`, borderRadius: 4, overflow: 'hidden', background: '#ffffff' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'grid', gridTemplateColumns: option.widths.map((width) => `${width}fr`).join(' '), border: `1px solid ${active ? '#93c5fd' : C.canvasBg}`, borderRadius: 4, overflow: 'hidden', background: C.bg }}>
                     {option.widths.map((_, index) => (
-                      <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${active ? '#93c5fd' : '#d4d4d8'}` }} />
+                      <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${active ? '#93c5fd' : C.canvasBg}` }} />
                     ))}
                   </div>
                 </button>
@@ -1763,7 +1873,7 @@ function SectionInspectorPanel({
         <BorderSection value={section} onChange={onUpdate} />
         <VisibilitySection value={section} onChange={onUpdate} showBorderRadius />
       </div>
-      <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.inspectorBorder}` }}>
+      <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
         <DangerButton label="Delete Row" onClick={onDelete} />
       </div>
     </div>
@@ -1785,10 +1895,11 @@ function Inspector({
   onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
   onDeleteSection: (sId: string) => void;
 }) {
+  const C = useT();
   return (
-    <div style={{ width: 280, background: C.inspectorBg, borderLeft: `1px solid ${C.inspectorBorder}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
+    <div style={{ width: 280, background: C.bg, borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
       {!selection && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: C.inspectorMuted, fontSize: 13, gap: 6 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: C.textMuted, fontSize: 13, gap: 6 }}>
           <MousePointerClick size={28} strokeWidth={1.5} />
           <span>Click a block or section</span>
         </div>
@@ -1834,6 +1945,7 @@ function BlockPreview({
   onClick: (e: React.MouseEvent) => void;
   dimmed?: boolean;
 }) {
+  const C = useT();
   const [hover, setHover] = useState(false);
   const ringColor = isSelected ? C.blockSelected : hover ? `${C.accent}66` : 'transparent';
   const wrapStyle: React.CSSProperties = {
@@ -1992,6 +2104,7 @@ function SortableBlockItem({
 // ─── Section card (canvas) ───────────────────────────────────────────────────
 
 function ControlBtn({ icon, onClick, title }: { icon: React.ReactElement; onClick: (e: React.MouseEvent) => void; title?: string }) {
+  const C = useT();
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -1999,7 +2112,7 @@ function ControlBtn({ icon, onClick, title }: { icon: React.ReactElement; onClic
       title={title}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, border: 'none', borderRadius: 4, background: hover ? '#27272a' : '#18181b', color: '#e4e4e7', cursor: 'pointer' }}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, border: 'none', borderRadius: 4, background: hover ? '#27272a' : '#18181b', color: '#d4d4d8', cursor: 'pointer' }}
     >
       {icon}
     </button>
@@ -2013,6 +2126,7 @@ function AddBlockMenu({
   onAdd: (type: EmailBlockType) => void;
   onClose: () => void;
 }) {
+  const C = useT();
   const types: Array<{ type: EmailBlockType; label: string; Icon: React.FC<LucideProps> }> = [
     { type: 'heading',   label: 'Heading',   Icon: Heading1 },
     { type: 'paragraph', label: 'Paragraph', Icon: MessageSquare },
@@ -2024,12 +2138,12 @@ function AddBlockMenu({
   ];
 
   return (
-    <div style={{ position: 'absolute', bottom: '100%', left: 0, zIndex: 100, background: '#fff', border: `1px solid ${C.inspectorBorder}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.15)', padding: 6, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, minWidth: 220 }}>
+    <div style={{ position: 'absolute', bottom: '100%', left: 0, zIndex: 100, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.15)', padding: 6, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, minWidth: 220 }}>
       {types.map(({ type, label, Icon }) => (
         <button
           key={type}
           onClick={(e) => { e.stopPropagation(); onAdd(type); onClose(); }}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 4px', border: `1px solid ${C.inspectorBorder}`, borderRadius: 6, background: '#fafafa', cursor: 'pointer', fontSize: 11, color: '#52525b' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 4px', border: `1px solid ${C.border}`, borderRadius: 6, background: C.bgSubtle, cursor: 'pointer', fontSize: 11, color: C.textSecondary }}
         >
           <Icon size={16} />
           {label}
@@ -2138,6 +2252,7 @@ function DropZone({
   isEmpty?: boolean;
   isDragging?: boolean;
 }) {
+  const C = useT();
   const [over, setOver] = useState(false);
   const [dropMode, setDropMode] = useState<'new' | 'move' | null>(null);
   const leaveTimerRef = useRef<number | null>(null);
@@ -2234,7 +2349,7 @@ function DropZone({
           background: showMoveIndicator
             ? `repeating-linear-gradient(135deg, ${C.accent}12 0 10px, ${C.accent}22 10px 20px)`
             : 'transparent',
-          color: showMoveIndicator ? C.accent : '#a1a1aa',
+          color: showMoveIndicator ? C.accent : C.textFaint,
           fontSize: 12,
           fontWeight: 600,
           transition: 'height .12s, border-color .1s, background .1s, color .1s',
@@ -2320,6 +2435,7 @@ function RowDropZone({
   position?: 'edge' | 'between';
   isDragging?: boolean;
 }) {
+  const C = useT();
   const [over, setOver] = useState(false);
   const [dropLabel, setDropLabel] = useState<'row' | 'section' | null>(null);
   const leaveTimerRef = useRef<number | null>(null);
@@ -2391,14 +2507,14 @@ function RowDropZone({
         pointerEvents: collapsed ? 'none' : undefined,
         margin: collapsed ? 0 : empty ? '24px 0' : over ? '4px 0' : '2px 0',
         borderRadius: 6,
-        border: collapsed ? 'none' : `2px dashed ${over ? C.accent : (isDragging || empty) ? '#e4e4e7' : 'transparent'}`,
+        border: collapsed ? 'none' : `2px dashed ${over ? C.accent : (isDragging || empty) ? C.border : 'transparent'}`,
         background: over
           ? `repeating-linear-gradient(135deg, ${C.accent}10 0 10px, ${C.accent}20 10px 20px)`
           : 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: over ? C.accent : '#a1a1aa',
+        color: over ? C.accent : C.textFaint,
         fontSize: 12,
         fontWeight: over ? 600 : 500,
         transition: 'background .12s, border-color .12s, color .12s, min-height .15s, height .15s',
@@ -2436,6 +2552,7 @@ function ColumnCard({
   onDeleteBlock?: (sId: string, cId: string, bId: string) => void;
   onBlockContextMenu?: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
 }) {
+  const C = useT();
   const { setNodeRef, isOver } = useDroppable({
     id: `column:${section.id}:${column.id}`,
     data: {
@@ -2523,12 +2640,12 @@ function ColumnCard({
         <div
           style={{
             height: 40,
-            border: `2px dashed ${isOver ? C.accent : '#d4d4d8'}`,
+            border: `2px dashed ${isOver ? C.accent : C.canvasBg}`,
             borderRadius: 6,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: isOver ? C.accent : '#a1a1aa',
+            color: isOver ? C.accent : C.textFaint,
             fontSize: 12,
             fontWeight: 600,
           }}
@@ -2585,6 +2702,7 @@ function SectionCard({
   onBlockContextMenu?: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
   onSectionContextMenu?: (e: React.MouseEvent) => void;
 }) {
+  const C = useT();
   const [hovered, setHovered] = useState(false);
   const isSectionSelected = selection?.type === 'section' && selection.sectionId === section.id;
 
@@ -2625,7 +2743,7 @@ function SectionCard({
               e.dataTransfer.effectAllowed = 'move';
             }}
             onClick={(e) => e.stopPropagation()}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, border: 'none', borderRadius: 4, background: '#18181b', color: '#e4e4e7', cursor: 'grab' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, border: 'none', borderRadius: 4, background: '#18181b', color: '#d4d4d8', cursor: 'grab' }}
           >
             <GripVertical size={13} />
           </button>
@@ -2927,6 +3045,7 @@ function TreeNode({
   onClick: () => void;
   children?: React.ReactNode;
 }) {
+  const C = useT();
   const [expanded, setExpanded] = useState(true);
   const hasChildren = Boolean(children);
 
@@ -2996,6 +3115,7 @@ function TreeView({
   onSelectSection: (sectionId: string) => void;
   onSelectBlock: (sectionId: string, columnId: string, blockId: string) => void;
 }) {
+  const C = useT();
   const blockLabel: Record<EmailBlockType, string> = {
     heading: 'Heading',
     paragraph: 'Paragraph',
@@ -3021,7 +3141,7 @@ function TreeView({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {doc.sections.length === 0 && (
-        <div style={{ padding: 16, color: '#a1a1aa', fontSize: 12, textAlign: 'center' }}>
+        <div style={{ padding: 16, color: C.textFaint, fontSize: 12, textAlign: 'center' }}>
           No rows yet
         </div>
       )}
@@ -3082,6 +3202,7 @@ function DraggablePaletteBlock({
   Icon: React.FC<LucideProps>;
   desc: string;
 }) {
+  const C = useT();
   const id = `palette-block:${type}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
@@ -3101,10 +3222,10 @@ function DraggablePaletteBlock({
         justifyContent: 'center',
         gap: 7,
         minHeight: 82,
-        border: `1px solid #d4d4d8`,
+        border: `1px solid ${C.border}`,
         borderRadius: 2,
-        background: '#ffffff',
-        color: '#3f3f46',
+        background: C.bg,
+        color: C.textSecondary,
         cursor: 'grab',
         fontSize: 10,
         boxShadow: '0 1px 1px rgba(0,0,0,.04)',
@@ -3130,6 +3251,7 @@ function DraggablePaletteRow({
   desc: string;
   columns: number[];
 }) {
+  const C = useT();
   const id = `palette-row:${label}:${JSON.stringify(columns)}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
@@ -3149,10 +3271,10 @@ function DraggablePaletteRow({
         justifyContent: 'center',
         gap: 7,
         minHeight: 82,
-        border: `1px solid #d4d4d8`,
+        border: `1px solid ${C.border}`,
         borderRadius: 2,
-        background: '#ffffff',
-        color: '#3f3f46',
+        background: C.bg,
+        color: C.textSecondary,
         cursor: 'grab',
         fontSize: 10,
         boxShadow: '0 1px 1px rgba(0,0,0,.04)',
@@ -3168,6 +3290,7 @@ function DraggablePaletteRow({
 }
 
 function DraggableLayoutRowPreview({ columns, layoutId }: { columns: number[]; layoutId: string }) {
+  const C = useT();
   const id = `palette-layout:${layoutId}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
@@ -3189,13 +3312,13 @@ function DraggableLayoutRowPreview({ columns, layoutId }: { columns: number[]; l
         touchAction: 'none',
       }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: columns.map((width) => `${width}fr`).join(' '), gap: 0, border: `1px solid #d4d4d8`, borderRadius: 3, overflow: 'hidden', minHeight: 64, background: '#ffffff' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: columns.map((width) => `${width}fr`).join(' '), gap: 0, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', minHeight: 64, background: C.bg }}>
         {columns.map((_, index) => (
           <div
             key={index}
             style={{
-              borderLeft: index === 0 ? 'none' : `1px solid #d4d4d8`,
-              background: '#ffffff',
+              borderLeft: index === 0 ? 'none' : `1px solid ${C.border}`,
+              background: C.bg,
             }}
           />
         ))}
@@ -3215,6 +3338,7 @@ function RailItem({
   active: boolean;
   onClick: () => void;
 }) {
+  const C = useT();
   return (
     <button
       onClick={onClick}
@@ -3229,9 +3353,9 @@ function RailItem({
         minHeight: 76,
         padding: '12px 8px',
         border: 'none',
-        borderBottom: `1px solid ${C.sidebarBorder}`,
-        background: active ? '#ffffff' : '#fafafa',
-        color: active ? '#18181b' : '#52525b',
+        borderBottom: `1px solid ${C.border}`,
+        background: active ? C.bg : C.bgSubtle,
+        color: active ? C.text : C.textSecondary,
         cursor: 'pointer',
         fontSize: 10,
         fontWeight: active ? 700 : 600,
@@ -3246,9 +3370,9 @@ function RailItem({
             top: '50%',
             width: 12,
             height: 12,
-            background: '#ffffff',
-            borderTop: `1px solid ${C.sidebarBorder}`,
-            borderRight: `1px solid ${C.sidebarBorder}`,
+            background: C.bg,
+            borderTop: `1px solid ${C.border}`,
+            borderRight: `1px solid ${C.border}`,
             transform: 'translateY(-50%) rotate(45deg)',
             zIndex: 2,
           }}
@@ -3444,10 +3568,11 @@ function CodeBlock({
 }
 
 function JsonViewerPanel({ doc }: { doc: EmailDocument }) {
+  const C = useT();
   const json = JSON.stringify(doc, null, 2);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
-      <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+      <span style={{ fontSize: 10, color: C.textFaint }}>
         {(json.length / 1024).toFixed(1)} KB
       </span>
       <CodeBlock code={json} language="json" />
@@ -3456,10 +3581,11 @@ function JsonViewerPanel({ doc }: { doc: EmailDocument }) {
 }
 
 function HtmlOutputPanel({ doc }: { doc: EmailDocument }) {
+  const C = useT();
   const html = renderEmailDocument(doc);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
-      <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+      <span style={{ fontSize: 10, color: C.textFaint }}>
         {(html.length / 1024).toFixed(1)} KB
       </span>
       <CodeBlock code={html} language="html" />
@@ -3482,6 +3608,7 @@ function ResizablePanel({
   maxWidth: number;
   side: 'left' | 'right';
 }) {
+  const C = useT();
   const [width, setWidth] = useState(defaultWidth);
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -3587,10 +3714,11 @@ function Sidebar({
   customTabs?: CustomTab[];
   features: EditorFeatures;
 }) {
+  const C = useT();
   const shellStyle: React.CSSProperties = {
     width: '100%',
-    background: '#f5f5f4',
-    borderRight: `1px solid ${C.sidebarBorder}`,
+    background: C.bgMuted,
+    borderRight: `1px solid ${C.border}`,
     display: 'flex',
     flexShrink: 0,
     overflow: 'hidden',
@@ -3598,8 +3726,8 @@ function Sidebar({
 
   const railStyle: React.CSSProperties = {
     width: 74,
-    background: '#fafaf9',
-    borderRight: `1px solid ${C.sidebarBorder}`,
+    background: C.bgSubtle,
+    borderRight: `1px solid ${C.border}`,
     display: 'flex',
     flexDirection: 'column',
     flexShrink: 0,
@@ -3607,7 +3735,7 @@ function Sidebar({
 
   const contentPanelStyle: React.CSSProperties = {
     flex: 1,
-    background: '#ffffff',
+    background: C.bg,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -3619,7 +3747,7 @@ function Sidebar({
     alignItems: 'center',
     gap: 6,
     padding: '0 14px',
-    borderBottom: `1px solid ${C.sidebarBorder}`,
+    borderBottom: `1px solid ${C.border}`,
     flexShrink: 0,
   };
 
@@ -3660,7 +3788,7 @@ function Sidebar({
       </div>
       <div style={contentPanelStyle}>
         <div style={panelHeaderStyle}>
-          <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: '#09090b' }}>{title}</span>
+          <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: C.text }}>{title}</span>
         </div>
         <div style={panelBodyStyle}>{body}</div>
       </div>
@@ -3671,7 +3799,7 @@ function Sidebar({
     return renderShell(
       'Rows',
       <div>
-        <div style={{ fontSize: 11, fontWeight: 500, color: '#3f3f46', marginBottom: 10 }}>Drag row layout</div>
+        <div style={{ fontSize: 11, fontWeight: 500, color: C.textSecondary, marginBottom: 10 }}>Drag row layout</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {BLOCK_LAYOUTS.map((layout) => (
             <DraggableLayoutRowPreview
@@ -3728,19 +3856,19 @@ function Sidebar({
                 alignItems: 'center',
                 gap: 12,
                 padding: '12px 14px',
-                border: `1px solid ${C.sidebarBorder}`,
+                border: `1px solid ${C.border}`,
                 borderRadius: 8,
-                background: '#ffffff',
+                background: C.bg,
                 cursor: 'pointer',
                 textAlign: 'left',
               }}
             >
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: C.bgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: C.textSecondary }}>
                 {Icon ? <Icon size={18} /> : <Layers size={18} />}
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{template.label}</div>
-                {template.desc && <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{template.desc}</div>}
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{template.label}</div>
+                {template.desc && <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.3 }}>{template.desc}</div>}
               </div>
             </button>
           );
@@ -3799,7 +3927,7 @@ function Sidebar({
       </div>
       {sampleBlocks && sampleBlocks.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Sample Blocks</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Sample Blocks</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {sampleBlocks.map((sb) => {
               const SbIcon = sb.icon;
@@ -3816,19 +3944,19 @@ function Sidebar({
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 12px',
-                    border: `1px solid ${C.sidebarBorder}`,
+                    border: `1px solid ${C.border}`,
                     borderRadius: 8,
-                    background: '#ffffff',
+                    background: C.bg,
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
-                  <div style={{ width: 30, height: 30, borderRadius: 6, background: '#f4f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#52525b' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 6, background: C.bgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: C.textSecondary }}>
                     {SbIcon ? <SbIcon size={14} /> : <Layers size={14} />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#18181b', lineHeight: 1.3 }}>{sb.label}</div>
-                    {sb.desc && <div style={{ fontSize: 11, color: '#71717a', lineHeight: 1.3 }}>{sb.desc}</div>}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{sb.label}</div>
+                    {sb.desc && <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.3 }}>{sb.desc}</div>}
                   </div>
                 </button>
               );
@@ -3849,18 +3977,19 @@ function Toolbar({
   previewEnabled: boolean;
   onTogglePreview: () => void;
 }) {
+  const C = useT();
   return (
-    <div style={{ height: 44, background: '#fff', borderBottom: `1px solid ${C.inspectorBorder}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, flexShrink: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: '#18181b', flex: 1 }}>Block Builder</span>
+    <div style={{ height: 44, background: C.bg, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, flexShrink: 0 }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: C.text, flex: 1 }}>Block Builder</span>
       <button
         onClick={onTogglePreview}
         title={previewEnabled ? 'Exit Preview' : 'Preview Mode'}
         style={{
           padding: '5px 12px',
-          border: `1px solid ${previewEnabled ? C.accent : C.inspectorBorder}`,
+          border: `1px solid ${previewEnabled ? C.accent : C.border}`,
           borderRadius: 6,
           background: previewEnabled ? C.accent : 'transparent',
-          color: previewEnabled ? '#fff' : '#52525b',
+          color: previewEnabled ? C.textOnAccent : C.textSecondary,
           cursor: 'pointer',
           fontSize: 12,
           fontWeight: 500,
@@ -3885,6 +4014,7 @@ function DeviceToggle({
   viewMode: ViewMode;
   onViewMode: (m: ViewMode) => void;
 }) {
+  const C = useT();
   const modes: Array<{ mode: ViewMode; Icon: React.FC<LucideProps>; title: string }> = [
     { mode: 'desktop', Icon: Laptop, title: 'Desktop' },
     { mode: 'tablet', Icon: Tablet, title: 'Tablet' },
@@ -3892,7 +4022,7 @@ function DeviceToggle({
   ];
 
   return (
-    <div style={{ display: 'inline-flex', gap: 2, padding: 3, borderRadius: 8, background: '#fff', border: `1px solid ${C.inspectorBorder}`, boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
+    <div style={{ display: 'inline-flex', gap: 2, padding: 3, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
       {modes.map(({ mode, Icon, title }) => (
         <button
           key={mode}
@@ -3904,7 +4034,7 @@ function DeviceToggle({
             border: 'none',
             borderRadius: 6,
             background: viewMode === mode ? C.accent : 'transparent',
-            color: viewMode === mode ? '#fff' : '#71717a',
+            color: viewMode === mode ? C.textOnAccent : C.textMuted,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -3943,6 +4073,7 @@ function ContextMenuOverlay({
   onAction: (action: ContextMenuAction) => void;
   onClose: () => void;
 }) {
+  const C = useT();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3968,7 +4099,7 @@ function ContextMenuOverlay({
     padding: '6px 12px',
     border: 'none',
     background: 'transparent',
-    color: disabled ? '#d4d4d8' : '#27272a',
+    color: disabled ? C.canvasBg : '#27272a',
     cursor: disabled ? 'default' : 'pointer',
     fontSize: 12,
     fontWeight: 500,
@@ -3987,10 +4118,10 @@ function ContextMenuOverlay({
     justifyContent: 'center',
     width: 28,
     height: 28,
-    border: `1px solid ${active ? C.accent : C.inspectorBorder}`,
+    border: `1px solid ${active ? C.accent : C.border}`,
     borderRadius: 4,
     background: active ? `${C.accent}14` : '#fff',
-    color: active ? C.accent : '#52525b',
+    color: active ? C.accent : C.textSecondary,
     cursor: 'pointer',
   });
 
@@ -4006,8 +4137,8 @@ function ContextMenuOverlay({
           left: menu.x,
           top: menu.y,
           minWidth: 180,
-          background: '#ffffff',
-          border: `1px solid ${C.inspectorBorder}`,
+          background: C.bg,
+          border: `1px solid ${C.border}`,
           borderRadius: 8,
           boxShadow: '0 4px 20px rgba(0,0,0,.14)',
           padding: 4,
@@ -4017,7 +4148,7 @@ function ContextMenuOverlay({
         <button
           style={itemStyle(!canMoveUp)}
           disabled={!canMoveUp}
-          onMouseEnter={(e) => { if (canMoveUp) (e.currentTarget.style.background = '#f4f4f5'); }}
+          onMouseEnter={(e) => { if (canMoveUp) (e.currentTarget.style.background = C.bgHover); }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           onClick={() => { if (canMoveUp) onAction({ kind: 'moveUp' }); }}
         >
@@ -4026,7 +4157,7 @@ function ContextMenuOverlay({
         <button
           style={itemStyle(!canMoveDown)}
           disabled={!canMoveDown}
-          onMouseEnter={(e) => { if (canMoveDown) (e.currentTarget.style.background = '#f4f4f5'); }}
+          onMouseEnter={(e) => { if (canMoveDown) (e.currentTarget.style.background = C.bgHover); }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           onClick={() => { if (canMoveDown) onAction({ kind: 'moveDown' }); }}
         >
@@ -4035,8 +4166,8 @@ function ContextMenuOverlay({
 
         {isBlock && (
           <>
-            <div style={{ height: 1, background: C.inspectorBorder, margin: '4px 0' }} />
-            <div style={{ padding: '4px 12px', fontSize: 11, color: '#a1a1aa', fontWeight: 600 }}>Alignment</div>
+            <div style={{ height: 1, background: C.border, margin: '4px 0' }} />
+            <div style={{ padding: '4px 12px', fontSize: 11, color: C.textFaint, fontWeight: 600 }}>Alignment</div>
             <div style={{ display: 'flex', gap: 4, padding: '4px 12px' }}>
               <button
                 style={alignBtnStyle(currentAlign === 'left')}
@@ -4063,7 +4194,7 @@ function ContextMenuOverlay({
           </>
         )}
 
-        <div style={{ height: 1, background: C.inspectorBorder, margin: '4px 0' }} />
+        <div style={{ height: 1, background: C.border, margin: '4px 0' }} />
         <button
           style={dangerItemStyle}
           onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
@@ -4078,6 +4209,7 @@ function ContextMenuOverlay({
 }
 
 function FloatingDeleteButton({ onClick }: { onClick: () => void }) {
+  const C = useT();
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -4095,7 +4227,7 @@ function FloatingDeleteButton({ onClick }: { onClick: () => void }) {
         border: 'none',
         borderRadius: 6,
         background: hover ? C.dangerHover : C.danger,
-        color: '#ffffff',
+        color: C.textOnAccent,
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -4110,6 +4242,7 @@ function FloatingDeleteButton({ onClick }: { onClick: () => void }) {
 }
 
 function AddRowButton({ position, onClick }: { position: 'top' | 'bottom'; onClick: () => void }) {
+  const C = useT();
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -4127,8 +4260,8 @@ function AddRowButton({ position, onClick }: { position: 'top' | 'bottom'; onCli
         height: 28,
         border: `2px solid ${hover ? C.accentHover : C.accent}`,
         borderRadius: '50%',
-        background: hover ? C.accent : '#ffffff',
-        color: hover ? '#ffffff' : C.accent,
+        background: hover ? C.accent : C.bg,
+        color: hover ? C.textOnAccent : C.accent,
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -4185,6 +4318,7 @@ function Canvas({
   onBlockContextMenu: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
   onSectionContextMenu: (e: React.MouseEvent, sectionId: string, sectionIndex: number, totalSections: number) => void;
 }) {
+  const C = useT();
   const isMobilePreview = viewMode === 'mobile';
   const isTabletPreview = viewMode === 'tablet';
   const rowContentWidth = isMobilePreview ? 375 : isTabletPreview ? 768 : doc.settings.contentWidth;
@@ -4205,7 +4339,7 @@ function Canvas({
           width: canvasWidth,
           maxWidth: isMobilePreview ? 375 : isTabletPreview ? 768 : '100%',
           minHeight: '100%',
-          background: '#fff',
+          background: C.bg,
           boxShadow: '0 4px 24px rgba(0,0,0,.12)',
           borderRadius: 4,
           overflow: 'hidden',
@@ -4294,6 +4428,7 @@ function BodySettingsPanel({
   doc: EmailDocument;
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
 }) {
+  const C = useT();
   const fontFamilyOptions = [
     { value: "'Inter', 'Helvetica Neue', Arial, sans-serif", label: 'Inter' },
     { value: "'Georgia', serif", label: 'Georgia' },
@@ -4337,10 +4472,10 @@ function BodySettingsPanel({
               onClick={() => onUpdateSettings({ linkUnderline: !doc.settings.linkUnderline })}
               style={{
                 padding: '5px 12px',
-                border: `1px solid ${doc.settings.linkUnderline ? C.accent : C.inspectorBorder}`,
+                border: `1px solid ${doc.settings.linkUnderline ? C.accent : C.border}`,
                 borderRadius: 6,
-                background: doc.settings.linkUnderline ? `${C.accent}12` : '#fafafa',
-                color: doc.settings.linkUnderline ? C.accent : '#71717a',
+                background: doc.settings.linkUnderline ? `${C.accent}12` : C.bgSubtle,
+                color: doc.settings.linkUnderline ? C.accent : C.textMuted,
                 cursor: 'pointer',
                 fontSize: 12,
                 fontWeight: 500,
@@ -4388,7 +4523,7 @@ function BodySettingsPanel({
         <InspectorSection title="Meta">
           <Field label="Preheader Text">
             <textarea
-              style={{ ...textareaStyle, minHeight: 60 }}
+              style={{ ...textareaStyle(C), minHeight: 60 }}
               value={doc.settings.preheaderText}
               onChange={(e) => onUpdateSettings({ preheaderText: e.target.value })}
               placeholder="Preview text shown in inbox..."
@@ -4419,6 +4554,7 @@ function RightInspector({
   onClearSelection: () => void;
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
 }) {
+  const C = useT();
   let content: React.ReactNode = <BodySettingsPanel doc={doc} onUpdateSettings={onUpdateSettings} />;
 
   if (selection) {
@@ -4457,8 +4593,8 @@ function RightInspector({
     <div
       style={{
         width: '100%',
-        background: '#ffffff',
-        borderLeft: `1px solid ${C.sidebarBorder}`,
+        background: C.bg,
+        borderLeft: `1px solid ${C.border}`,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -4475,12 +4611,14 @@ export function EmailBlockEditor({
   value,
   onChange,
   height = '100%',
+  theme: themeMode = 'light',
   defaultPalette,
   sampleBlocks,
   templates: userTemplates,
   customTabs,
   features: featureOverrides,
 }: EmailBlockEditorProps) {
+  const themeTokens = getTheme(themeMode);
   const features: EditorFeatures = { ...DEFAULT_FEATURES, ...featureOverrides };
   const [doc, setDoc] = useState<EmailDocument>(() => {
     const base = value ? normalizeDocument(value) : createEmptyDocument();
@@ -5043,6 +5181,7 @@ export function EmailBlockEditor({
   const overlayBlock = activeBlock ?? activePaletteBlock;
 
   return (
+    <ThemeContext.Provider value={themeTokens}>
     <PaletteContext.Provider value={{ palette: doc.settings.colorPalette, customColors: doc.settings.customColors }}>
     <div style={{ display: 'flex', flexDirection: 'column', height, width: '100%', overflow: 'hidden', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", fontSize: 13, position: 'relative' }}>
       <Toolbar
@@ -5135,16 +5274,16 @@ export function EmailBlockEditor({
               width: 220,
               display: 'grid',
               gridTemplateColumns: activePaletteRow.map((w) => `${w}fr`).join(' '),
-              border: `1px solid ${C.inspectorBorder}`,
+              border: `1px solid ${themeTokens.border}`,
               borderRadius: 6,
               overflow: 'hidden',
-              background: '#ffffff',
+              background: themeTokens.bg,
               minHeight: 58,
               boxShadow: '0 4px 18px rgba(0,0,0,.14)',
             }}
           >
             {activePaletteRow.map((_, index) => (
-              <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${C.inspectorBorder}` }} />
+              <div key={index} style={{ borderLeft: index === 0 ? 'none' : `1px solid ${themeTokens.border}` }} />
             ))}
           </div>
         ) : null}
@@ -5159,5 +5298,6 @@ export function EmailBlockEditor({
       )}
     </div>
     </PaletteContext.Provider>
+    </ThemeContext.Provider>
   );
 }

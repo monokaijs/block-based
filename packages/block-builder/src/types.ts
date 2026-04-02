@@ -321,6 +321,8 @@ export type EditorFeatures = {
   customColors: boolean;
 };
 
+export type EditorThemeMode = 'light' | 'dark';
+
 export type EmailDocument = {
   version: 1;
   settings: EmailDocumentSettings;
