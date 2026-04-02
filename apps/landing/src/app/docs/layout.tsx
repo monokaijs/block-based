@@ -49,9 +49,9 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       <Navbar />
-      <div className="mx-auto flex max-w-6xl flex-1 px-6 py-10 gap-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 px-6 py-10 gap-10">
         <Sidebar />
-        <main className="min-w-0 flex-1 prose prose-invert prose-sm max-w-none
+        <main className="min-w-0 w-full max-w-3xl prose prose-invert prose-sm
           prose-headings:font-bold prose-headings:tracking-tight
           prose-a:text-primary
           prose-code:before:content-none prose-code:after:content-none
