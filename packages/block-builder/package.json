@@ -1,7 +1,18 @@
 {
   "name": "block-based",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
+  "description": "A composable, block-based email editor component for React",
+  "homepage": "https://blockbased.creaton.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monokaijs/block-based.git"
+  },
+  "bugs": {
+    "url": "https://github.com/monokaijs/block-based/issues"
+  },
+  "license": "MIT",
+  "keywords": ["email", "editor", "block", "react", "email-builder", "drag-and-drop"],
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
