@@ -1,6 +1,6 @@
 # Customization
 
-The editor can be extended with custom blocks, sidebar tabs, templates, and feature flags.
+The editor can be extended with custom blocks, sidebar tabs, templates, and feature flags — including customizing the main sidebar tab bar.
 
 ## Sample Blocks
 
@@ -44,28 +44,32 @@ const sampleBlocks: SampleBlock[] = [
 
 ## Custom Sidebar Tabs
 
-Add entirely new tabs to the sidebar:
+Add entirely new tabs to the sidebar. Custom tabs are rendered after any built-in tabs that remain enabled, so you can tailor the main tab bar to your app:
 
 ```tsx
-import type { CustomTab, CustomTabContext } from 'block-based';
+import { Settings2 } from 'lucide-react';
+import type { CustomTab } from 'block-based';
 
 const tabs: CustomTab[] = [
   {
-    id: 'my-tab',
-    label: 'My Tab',
-    icon: '⚙️',
-    render: (ctx: CustomTabContext) => (
+    id: 'branding',
+    label: 'Branding',
+    icon: Settings2,
+    render: (ctx) => (
       <div>
-        <p>Document has {ctx.document.sections.length} sections</p>
-        <button onClick={() => ctx.onChange({ ...ctx.document, sections: [] })}>
-          Clear all
+        <p>Document has {ctx.doc.sections.length} sections</p>
+        <button onClick={() => ctx.updateSettings({ fontFamily: 'Georgia, serif' })}>
+          Use serif font
         </button>
       </div>
     ),
   },
 ];
 
-<EmailBlockEditor customTabs={tabs} />
+<EmailBlockEditor
+  features={{ json: false, html: false }}
+  customTabs={tabs}
+/>
 ```
 
 The `CustomTabContext` provides:
@@ -79,8 +83,9 @@ The `CustomTabContext` provides:
     </tr>
   </thead>
   <tbody>
-    <tr><td>`document`</td><td>`EmailDocument`</td><td>Current document state</td></tr>
-    <tr><td>`onChange`</td><td>`(doc: EmailDocument) => void`</td><td>Update the document</td></tr>
+    <tr><td>`doc`</td><td>`EmailDocument`</td><td>Current document state</td></tr>
+    <tr><td>`selection`</td><td>`Selection | null`</td><td>The currently selected block or section</td></tr>
+    <tr><td>`updateSettings`</td><td>`(patch: Partial&lt;EmailDocumentSettings&gt;) => void`</td><td>Update global document settings</td></tr>
   </tbody>
 </table>
 
@@ -128,6 +133,8 @@ Toggle UI features on or off:
     rows: true,          // Layout presets sidebar tab
     templates: false,    // Hide templates tab
     treeView: false,     // Hide document tree
+    json: false,         // Hide the built-in JSON tab
+    html: false,         // Hide the built-in HTML tab
     bodySettings: true,  // Global settings panel
     preview: true,       // HTML preview
     dragDrop: true,      // Drag-and-drop
@@ -136,4 +143,4 @@ Toggle UI features on or off:
 />
 ```
 
-All flags default to `true`. Set to `false` to hide.
+All flags default to `true`. Set any of them to `false` to hide that part of the UI.

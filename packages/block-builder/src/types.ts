@@ -311,6 +311,10 @@ export type EditorFeatures = {
   templates: boolean;
   /** Document tree view tab. */
   treeView: boolean;
+  /** JSON document viewer tab. */
+  json: boolean;
+  /** HTML output viewer tab. */
+  html: boolean;
   /** Body settings tab. */
   bodySettings: boolean;
   /** Preview mode toggle. */

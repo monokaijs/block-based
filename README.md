@@ -92,6 +92,8 @@ Toggle individual editor capabilities via the `features` prop:
     rows: true,         // Rows/layouts palette tab
     templates: true,    // Prebuilt section templates tab
     treeView: true,     // Document tree view tab
+    json: false,        // Hide the built-in JSON tab
+    html: false,        // Hide the built-in HTML tab
     bodySettings: true, // Body settings panel
     preview: true,      // Preview mode toggle
     dragDrop: true,     // Drag-and-drop reordering
@@ -99,6 +101,8 @@ Toggle individual editor capabilities via the `features` prop:
   }}
 />
 ```
+
+Use these flags to customize the main sidebar tab bar. Any `customTabs` you provide are appended after the built-in tabs that remain visible.
 
 ## Block types
 

@@ -65,6 +65,8 @@ Use the `features` prop to toggle parts of the UI:
     rows: true,          // Sidebar "Rows" tab (layout presets)
     templates: true,     // Sidebar "Templates" tab
     treeView: true,      // Sidebar document tree
+    json: false,         // Hide the built-in JSON tab
+    html: false,         // Hide the built-in HTML tab
     bodySettings: true,  // Global document settings panel
     preview: true,       // HTML preview panel
     dragDrop: true,      // Drag-and-drop reordering
@@ -74,6 +76,8 @@ Use the `features` prop to toggle parts of the UI:
 ```
 
 Set any flag to `false` to hide that feature. All flags default to `true`.
+
+Use this to customize the main sidebar tab bar — for example, set `json: false` and `html: false` to remove those two built-in output tabs.
 
 ## Custom Color Palette
 

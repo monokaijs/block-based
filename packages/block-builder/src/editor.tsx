@@ -205,19 +205,42 @@ type Selection =
   | { type: 'section'; sectionId: string }
   | null;
 
-type SidebarTab = 'blocks' | 'sections' | 'templates' | 'tree' | string;
+type SidebarTab = 'blocks' | 'sections' | 'templates' | 'tree' | 'json' | 'html' | string;
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
+type SidebarNavItem = { id: SidebarTab; label: string; Icon: React.FC<LucideProps> };
 
 const DEFAULT_FEATURES: EditorFeatures = {
   content: true,
   rows: true,
   templates: true,
   treeView: true,
+  json: true,
+  html: true,
   bodySettings: true,
   preview: true,
   dragDrop: true,
   customColors: true,
 };
+
+function getSidebarNavItems(features: EditorFeatures, customTabs?: CustomTab[]): SidebarNavItem[] {
+  return [
+    ...(features.content ? [{ id: 'blocks' as SidebarTab, label: 'Content', Icon: Rows4 }] : []),
+    ...(features.rows ? [{ id: 'sections' as SidebarTab, label: 'Rows', Icon: MinusSquare }] : []),
+    ...(features.templates ? [{ id: 'templates' as SidebarTab, label: 'Templates', Icon: Layers }] : []),
+    ...(features.treeView ? [{ id: 'tree' as SidebarTab, label: 'Tree', Icon: ListTree }] : []),
+    ...(features.json ? [{ id: 'json' as SidebarTab, label: 'JSON', Icon: Braces }] : []),
+    ...(features.html ? [{ id: 'html' as SidebarTab, label: 'HTML', Icon: FileCode }] : []),
+    ...(customTabs ?? []).map((tab) => ({
+      id: tab.id as SidebarTab,
+      label: tab.label,
+      Icon: tab.icon as React.FC<LucideProps>,
+    })),
+  ];
+}
+
+function getDefaultSidebarTab(features: EditorFeatures, customTabs?: CustomTab[]): SidebarTab {
+  return getSidebarNavItems(features, customTabs)[0]?.id ?? 'blocks';
+}
 
 export interface EmailBlockEditorProps {
   value?: EmailDocument;
@@ -3770,19 +3793,8 @@ function Sidebar({
     padding: '14px',
   };
 
-  const navItems: Array<{ id: SidebarTab; label: string; Icon: React.FC<LucideProps> }> = [
-    ...(features.content ? [{ id: 'blocks' as SidebarTab, label: 'Content', Icon: Rows4 }] : []),
-    ...(features.rows ? [{ id: 'sections' as SidebarTab, label: 'Rows', Icon: MinusSquare }] : []),
-    ...(features.templates ? [{ id: 'templates' as SidebarTab, label: 'Templates', Icon: Layers }] : []),
-    ...(features.treeView ? [{ id: 'tree' as SidebarTab, label: 'Tree', Icon: ListTree }] : []),
-    { id: 'json' as SidebarTab, label: 'JSON', Icon: Braces },
-    { id: 'html' as SidebarTab, label: 'HTML', Icon: FileCode },
-    ...(customTabs ?? []).map((tab) => ({
-      id: tab.id as SidebarTab,
-      label: tab.label,
-      Icon: tab.icon as React.FC<LucideProps>,
-    })),
-  ];
+  const navItems = getSidebarNavItems(features, customTabs);
+  const currentTab = navItems.find((item) => item.id === activeTab)?.id ?? navItems[0]?.id ?? 'blocks';
 
   const renderShell = (title: string, body: React.ReactNode) => (
     <div style={shellStyle}>
@@ -3793,7 +3805,7 @@ function Sidebar({
               key={item.id}
               label={item.label}
               Icon={item.Icon}
-              active={activeTab === item.id}
+              active={currentTab === item.id}
               onClick={() => {
                 onTabChange(item.id);
               }}
@@ -3836,7 +3848,7 @@ function Sidebar({
     </div>
   );
 
-  if (activeTab === 'sections') {
+  if (currentTab === 'sections') {
     return renderShell(
       'Rows',
       <div>
@@ -3856,7 +3868,7 @@ function Sidebar({
 
 
 
-  if (activeTab === 'tree') {
+  if (currentTab === 'tree') {
     return renderShell(
       'Tree View',
       <TreeView
@@ -3868,7 +3880,7 @@ function Sidebar({
     );
   }
 
-  if (activeTab === 'templates') {
+  if (currentTab === 'templates') {
     const allTemplates = [
       ...PREBUILT_TEMPLATES.map((t) => ({
         id: t.id,
@@ -3919,7 +3931,7 @@ function Sidebar({
   }
 
   // ── JSON Viewer tab ─────────────────────────────────────────────────────────
-  if (activeTab === 'json') {
+  if (currentTab === 'json') {
     return renderShell(
       'JSON Viewer',
       <JsonViewerPanel doc={doc} />,
@@ -3927,7 +3939,7 @@ function Sidebar({
   }
 
   // ── HTML Output tab ────────────────────────────────────────────────────────
-  if (activeTab === 'html') {
+  if (currentTab === 'html') {
     return renderShell(
       'HTML Output',
       <HtmlOutputPanel doc={doc} />,
@@ -3935,7 +3947,7 @@ function Sidebar({
   }
 
   // ── Custom tabs ─────────────────────────────────────────────────────────────
-  const customTab = (customTabs ?? []).find((t) => t.id === activeTab);
+  const customTab = (customTabs ?? []).find((t) => t.id === currentTab);
   if (customTab) {
     return renderShell(
       customTab.label,
@@ -4670,10 +4682,17 @@ export function EmailBlockEditor({
     return base;
   });
   const [selection, setSelection] = useState<Selection>(null);
-  const [activeTab, setActiveTab] = useState<SidebarTab>('blocks');
+  const [activeTab, setActiveTab] = useState<SidebarTab>(() => getDefaultSidebarTab(features, customTabs));
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
   const [previewEnabled, setPreviewEnabled] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+
+  useEffect(() => {
+    const visibleTabIds = new Set(getSidebarNavItems(features, customTabs).map((item) => item.id));
+    if (visibleTabIds.size > 0 && !visibleTabIds.has(activeTab)) {
+      setActiveTab(getDefaultSidebarTab(features, customTabs));
+    }
+  }, [activeTab, features, customTabs]);
 
   // ── Drag state (lifted from Canvas) ────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
