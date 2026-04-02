@@ -2842,12 +2842,116 @@ function RailItem({
 
 // ─── Built-in output tabs ────────────────────────────────────────────────────
 
+// Catppuccin Mocha–inspired palette for syntax highlighting
+const SYN = {
+  bg: '#1e1e2e',
+  fg: '#cdd6f4',
+  string: '#a6e3a1',
+  number: '#fab387',
+  boolean: '#f38ba8',
+  null: '#f5c2e7',
+  key: '#89b4fa',
+  punctuation: '#9399b2',
+  tag: '#cba6f7',
+  attrName: '#89dceb',
+  attrValue: '#a6e3a1',
+  comment: '#6c7086',
+  doctype: '#f5c2e7',
+  entity: '#fab387',
+};
+
+type SynToken = { text: string; color?: string };
+
+function highlightJson(src: string): SynToken[] {
+  const tokens: SynToken[] = [];
+  const re = /("(?:\\.|[^"\\])*")\s*(:)|("(?:\\.|[^"\\])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],:])|(\s+)/g;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  while ((m = re.exec(src)) !== null) {
+    if (m.index > last) tokens.push({ text: src.slice(last, m.index) });
+    if (m[1] !== undefined) {
+      // key + colon
+      tokens.push({ text: m[1], color: SYN.key });
+      tokens.push({ text: m[2], color: SYN.punctuation });
+    } else if (m[3] !== undefined) {
+      tokens.push({ text: m[3], color: SYN.string });
+    } else if (m[4] !== undefined) {
+      tokens.push({ text: m[4], color: SYN.number });
+    } else if (m[5] !== undefined) {
+      tokens.push({ text: m[5], color: SYN.boolean });
+    } else if (m[6] !== undefined) {
+      tokens.push({ text: m[6], color: SYN.null });
+    } else if (m[7] !== undefined) {
+      tokens.push({ text: m[7], color: SYN.punctuation });
+    } else if (m[8] !== undefined) {
+      tokens.push({ text: m[8] });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) tokens.push({ text: src.slice(last) });
+  return tokens;
+}
+
+function highlightHtml(src: string): SynToken[] {
+  const tokens: SynToken[] = [];
+  // Match tags, comments, doctype, entities, and plain text
+  const re = /(<!--[\s\S]*?-->)|(<!DOCTYPE[^>]*>)|(<\/?)(\w[\w-]*)(\s[^>]*)?(\/?>)|(&\w+;|&#\d+;|&#x[\da-fA-F]+;)/gi;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  while ((m = re.exec(src)) !== null) {
+    if (m.index > last) tokens.push({ text: src.slice(last, m.index), color: SYN.fg });
+    if (m[1] !== undefined) {
+      // comment
+      tokens.push({ text: m[1], color: SYN.comment });
+    } else if (m[2] !== undefined) {
+      // doctype
+      tokens.push({ text: m[2], color: SYN.doctype });
+    } else if (m[4] !== undefined) {
+      // tag
+      tokens.push({ text: m[3], color: SYN.punctuation }); // <  or </
+      tokens.push({ text: m[4], color: SYN.tag }); // tag name
+      if (m[5]) {
+        // attributes
+        const attrSrc = m[5];
+        const attrRe = /([\w-]+)(=)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|([\w-]+)(=)(\S+)|([\w-]+)|(\s+)/g;
+        let am: RegExpExecArray | null;
+        let aLast = 0;
+        while ((am = attrRe.exec(attrSrc)) !== null) {
+          if (am.index > aLast) tokens.push({ text: attrSrc.slice(aLast, am.index) });
+          if (am[1] !== undefined) {
+            tokens.push({ text: am[1], color: SYN.attrName });
+            tokens.push({ text: am[2], color: SYN.punctuation });
+            tokens.push({ text: am[3], color: SYN.attrValue });
+          } else if (am[4] !== undefined) {
+            tokens.push({ text: am[4], color: SYN.attrName });
+            tokens.push({ text: am[5], color: SYN.punctuation });
+            tokens.push({ text: am[6], color: SYN.attrValue });
+          } else if (am[7] !== undefined) {
+            tokens.push({ text: am[7], color: SYN.attrName });
+          } else if (am[8] !== undefined) {
+            tokens.push({ text: am[8] });
+          }
+          aLast = am.index + am[0].length;
+        }
+        if (aLast < attrSrc.length) tokens.push({ text: attrSrc.slice(aLast) });
+      }
+      tokens.push({ text: m[6], color: SYN.punctuation }); // > or />
+    } else if (m[7] !== undefined) {
+      // entity
+      tokens.push({ text: m[7], color: SYN.entity });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) tokens.push({ text: src.slice(last), color: SYN.fg });
+  return tokens;
+}
+
 const codeBlockStyle: React.CSSProperties = {
   fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace",
   fontSize: 11,
   lineHeight: 1.5,
-  background: '#1e1e2e',
-  color: '#cdd6f4',
+  background: SYN.bg,
+  color: SYN.fg,
   padding: 16,
   borderRadius: 8,
   margin: 0,
@@ -2857,126 +2961,88 @@ const codeBlockStyle: React.CSSProperties = {
   tabSize: 2,
 };
 
+const copyBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  padding: '4px 8px',
+  border: '1px solid rgba(255,255,255,0.15)',
+  borderRadius: 6,
+  background: 'rgba(30,30,46,0.85)',
+  backdropFilter: 'blur(4px)',
+  color: '#cdd6f4',
+  cursor: 'pointer',
+  fontSize: 10,
+  fontWeight: 500,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  zIndex: 5,
+  transition: 'background 0.15s, border-color 0.15s',
+};
+
+function CodeBlock({
+  code,
+  language,
+}: {
+  code: string;
+  language: 'json' | 'html';
+}) {
+  const [copied, setCopied] = useState(false);
+  const tokens = language === 'json' ? highlightJson(code) : highlightHtml(code);
+
+  return (
+    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        style={{
+          ...copyBtnStyle,
+          background: copied ? 'rgba(166,227,161,0.2)' : copyBtnStyle.background,
+          borderColor: copied ? 'rgba(166,227,161,0.4)' : copyBtnStyle.borderColor,
+          color: copied ? SYN.string : copyBtnStyle.color,
+        }}
+        onMouseEnter={(e) => { if (!copied) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+        onMouseLeave={(e) => { if (!copied) e.currentTarget.style.background = copyBtnStyle.background as string; }}
+      >
+        <Copy size={10} /> {copied ? 'Copied!' : 'Copy'}
+      </button>
+      <pre style={{ ...codeBlockStyle, flex: 1 }}>
+        {tokens.map((t, i) =>
+          t.color ? (
+            <span key={i} style={{ color: t.color }}>{t.text}</span>
+          ) : (
+            t.text
+          ),
+        )}
+      </pre>
+    </div>
+  );
+}
+
 function JsonViewerPanel({ doc }: { doc: EmailDocument }) {
   const json = JSON.stringify(doc, null, 2);
-  const [copied, setCopied] = useState(false);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(json);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-          style={{
-            padding: '4px 10px',
-            border: `1px solid ${C.inspectorBorder}`,
-            borderRadius: 6,
-            background: copied ? '#dcfce7' : '#fafafa',
-            color: copied ? '#166534' : '#52525b',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <Copy size={12} /> {copied ? 'Copied!' : 'Copy JSON'}
-        </button>
-        <span style={{ fontSize: 10, color: '#a1a1aa' }}>
-          {(json.length / 1024).toFixed(1)} KB
-        </span>
-      </div>
-      <pre style={{ ...codeBlockStyle, flex: 1 }}>{json}</pre>
+      <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+        {(json.length / 1024).toFixed(1)} KB
+      </span>
+      <CodeBlock code={json} language="json" />
     </div>
   );
 }
 
 function HtmlOutputPanel({ doc }: { doc: EmailDocument }) {
   const html = renderEmailDocument(doc);
-  const [copied, setCopied] = useState(false);
-  const [viewRaw, setViewRaw] = useState(true);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(html);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-          style={{
-            padding: '4px 10px',
-            border: `1px solid ${C.inspectorBorder}`,
-            borderRadius: 6,
-            background: copied ? '#dcfce7' : '#fafafa',
-            color: copied ? '#166534' : '#52525b',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <Copy size={12} /> {copied ? 'Copied!' : 'Copy HTML'}
-        </button>
-        <div style={{ display: 'flex', gap: 2, background: '#f4f4f5', borderRadius: 6, padding: 2 }}>
-          <button
-            onClick={() => setViewRaw(true)}
-            style={{
-              padding: '3px 8px',
-              border: 'none',
-              borderRadius: 4,
-              background: viewRaw ? '#ffffff' : 'transparent',
-              color: viewRaw ? '#18181b' : '#71717a',
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 500,
-              boxShadow: viewRaw ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
-            }}
-          >
-            Source
-          </button>
-          <button
-            onClick={() => setViewRaw(false)}
-            style={{
-              padding: '3px 8px',
-              border: 'none',
-              borderRadius: 4,
-              background: !viewRaw ? '#ffffff' : 'transparent',
-              color: !viewRaw ? '#18181b' : '#71717a',
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 500,
-              boxShadow: !viewRaw ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
-            }}
-          >
-            Preview
-          </button>
-        </div>
-        <span style={{ fontSize: 10, color: '#a1a1aa' }}>
-          {(html.length / 1024).toFixed(1)} KB
-        </span>
-      </div>
-      {viewRaw ? (
-        <pre style={{ ...codeBlockStyle, flex: 1 }}>{html}</pre>
-      ) : (
-        <iframe
-          srcDoc={html}
-          title="HTML Preview"
-          sandbox="allow-same-origin"
-          style={{
-            flex: 1,
-            border: `1px solid ${C.inspectorBorder}`,
-            borderRadius: 8,
-            background: '#ffffff',
-            width: '100%',
-          }}
-        />
-      )}
+      <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+        {(html.length / 1024).toFixed(1)} KB
+      </span>
+      <CodeBlock code={html} language="html" />
     </div>
   );
 }
