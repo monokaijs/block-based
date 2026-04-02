@@ -1,0 +1,71 @@
+# Rendering HTML
+
+Use `renderEmailDocument()` to convert a document into table-based, email-client-safe HTML.
+
+## Basic Usage
+
+```tsx
+import { renderEmailDocument } from 'block-based';
+import type { EmailDocument } from 'block-based';
+
+function exportEmail(doc: EmailDocument) {
+  const html = renderEmailDocument(doc);
+  // Send via your email API, save to file, or preview in an iframe
+  return html;
+}
+```
+
+## Output Characteristics
+
+The generated HTML is designed for maximum email client compatibility:
+
+- **Table-based layout** — uses `<table>`, `<tr>`, `<td>` for structure (not flexbox/grid)
+- **Inline styles** — all styling is inlined for clients that strip `<style>` tags
+- **Multi-column support** — columns rendered as table cells with percentage widths
+- **Preheader text** — hidden preview text included when `settings.preheaderText` is set
+- **Responsive width** — content container respects `settings.contentWidth` (default: 640px)
+
+## What Gets Rendered
+
+The renderer processes every part of the document:
+
+| Document Part | HTML Output |
+|---------------|-------------|
+| `settings.backgroundColor` | Outer `<body>` background |
+| `settings.contentBackgroundColor` | Inner container background |
+| `settings.fontFamily` / `fontSize` / `fontWeight` | Applied to the body wrapper |
+| `settings.preheaderText` | Hidden `<div>` at the top of the email |
+| Each `section` | A `<table>` row with section-level padding, background, and borders |
+| Each `column` | A `<td>` within the section's table row |
+| Each `block` | Block-specific HTML (see [Block Types](/docs/blocks)) |
+
+## Sending Emails
+
+The HTML string can be used with any email sending service:
+
+```tsx
+// Example with a generic email API
+const html = renderEmailDocument(doc);
+
+await sendEmail({
+  to: 'user@example.com',
+  subject: 'Your newsletter',
+  html,
+});
+```
+
+## Previewing in an Iframe
+
+```tsx
+function Preview({ doc }: { doc: EmailDocument }) {
+  const html = renderEmailDocument(doc);
+
+  return (
+    <iframe
+      srcDoc={html}
+      style={{ width: '100%', height: 600, border: 'none' }}
+      title="Email preview"
+    />
+  );
+}
+```

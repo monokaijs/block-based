@@ -1,0 +1,86 @@
+# EmailBlockEditor
+
+The `EmailBlockEditor` is the main React component. It renders a full email editing interface
+with a block canvas, sidebar, property inspector, and preview panel.
+
+## Basic Usage
+
+```tsx
+import { EmailBlockEditor, createEmptyDocument } from 'block-based';
+import type { EmailDocument } from 'block-based';
+import { useState } from 'react';
+
+function Editor() {
+  const [doc, setDoc] = useState<EmailDocument>(createEmptyDocument);
+
+  return <EmailBlockEditor value={doc} onChange={setDoc} height="600px" />;
+}
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `EmailDocument` | — | The document to edit. If omitted the editor creates its own internal state. |
+| `onChange` | `(doc: EmailDocument) => void` | — | Called whenever the document changes. |
+| `height` | `string \| number` | `"100%"` | CSS height of the editor container. |
+| `defaultPalette` | `Partial<ColorPalette>` | — | Override the default color palette tokens. |
+| `sampleBlocks` | `SampleBlock[]` | — | Extra blocks shown in the sidebar's Content tab. |
+| `templates` | `TemplateDefinition[]` | — | Extra section templates shown in the Templates tab. |
+| `customTabs` | `CustomTab[]` | — | Additional sidebar tabs with custom rendering. |
+| `features` | `Partial<EditorFeatures>` | all `true` | Enable / disable specific editor capabilities. |
+
+## Controlling the Editor
+
+The editor is a **controlled component** — pass `value` and `onChange` to own the state:
+
+```tsx
+const [doc, setDoc] = useState<EmailDocument>(createEmptyDocument);
+
+<EmailBlockEditor value={doc} onChange={setDoc} />
+```
+
+If you omit `value`, the editor manages its own internal document state.
+
+## Feature Flags
+
+Use the `features` prop to toggle parts of the UI:
+
+```tsx
+<EmailBlockEditor
+  value={doc}
+  onChange={setDoc}
+  features={{
+    content: true,       // Sidebar "Content" tab (block palette)
+    rows: true,          // Sidebar "Rows" tab (layout presets)
+    templates: true,     // Sidebar "Templates" tab
+    treeView: true,      // Sidebar document tree
+    bodySettings: true,  // Global document settings panel
+    preview: true,       // HTML preview panel
+    dragDrop: true,      // Drag-and-drop reordering
+    customColors: true,  // Custom color slots in the palette
+  }}
+/>
+```
+
+Set any flag to `false` to hide that feature. All flags default to `true`.
+
+## Custom Color Palette
+
+Override the semantic color tokens used throughout the editor's color pickers:
+
+```tsx
+<EmailBlockEditor
+  value={doc}
+  onChange={setDoc}
+  defaultPalette={{
+    primary: '#8b5cf6',
+    secondary: '#ec4899',
+    accent: '#f59e0b',
+    background: '#ffffff',
+    foreground: '#1f2937',
+  }}
+/>
+```
+
+See the [API Reference](/docs/api) for the full `ColorPalette` type.

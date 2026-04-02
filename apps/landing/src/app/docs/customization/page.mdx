@@ -1,0 +1,130 @@
+# Customization
+
+The editor can be extended with custom blocks, sidebar tabs, templates, and feature flags.
+
+## Sample Blocks
+
+Add custom blocks to the sidebar's **Content** tab. Each sample block has a label, optional
+description and icon, and a factory function that produces a block:
+
+```tsx
+import { EmailBlockEditor } from 'block-based';
+import type { SampleBlock, EmailBlock } from 'block-based';
+
+const sampleBlocks: SampleBlock[] = [
+  {
+    label: 'Brand Header',
+    description: 'Company logo and tagline',
+    icon: '🏢',
+    create: (): EmailBlock => ({
+      id: crypto.randomUUID(),
+      type: 'html',
+      content: '<div style="text-align:center"><h1>Acme Inc.</h1></div>',
+      paddingTop: 16,
+      paddingBottom: 16,
+      paddingLeft: 0,
+      paddingRight: 0,
+      marginTop: 0,
+      marginBottom: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      borderTopWidth: 0,
+      borderBottomWidth: 0,
+      borderLeftWidth: 0,
+      borderRightWidth: 0,
+      borderColor: '',
+      borderStyle: 'solid',
+      opacity: 100,
+    }),
+  },
+];
+
+<EmailBlockEditor sampleBlocks={sampleBlocks} />
+```
+
+## Custom Sidebar Tabs
+
+Add entirely new tabs to the sidebar:
+
+```tsx
+import type { CustomTab, CustomTabContext } from 'block-based';
+
+const tabs: CustomTab[] = [
+  {
+    id: 'my-tab',
+    label: 'My Tab',
+    icon: '⚙️',
+    render: (ctx: CustomTabContext) => (
+      <div>
+        <p>Document has {ctx.document.sections.length} sections</p>
+        <button onClick={() => ctx.onChange({ ...ctx.document, sections: [] })}>
+          Clear all
+        </button>
+      </div>
+    ),
+  },
+];
+
+<EmailBlockEditor customTabs={tabs} />
+```
+
+The `CustomTabContext` provides:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `document` | `EmailDocument` | Current document state |
+| `onChange` | `(doc: EmailDocument) => void` | Update the document |
+
+## Section Templates
+
+Provide pre-built section templates that appear in the **Templates** sidebar tab:
+
+```tsx
+import type { TemplateDefinition, EmailSectionInput } from 'block-based';
+
+const templates: TemplateDefinition[] = [
+  {
+    label: 'Newsletter Header',
+    description: 'Logo + navigation menu',
+    sections: [
+      {
+        columns: [
+          {
+            width: '100%',
+            blocks: [
+              { type: 'image', src: '/logo.png', alt: 'Logo', width: '120px' },
+              { type: 'menu', items: [
+                { label: 'Home', url: '#' },
+                { label: 'Blog', url: '#' },
+              ]},
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+<EmailBlockEditor templates={templates} />
+```
+
+## Feature Flags
+
+Toggle UI features on or off:
+
+```tsx
+<EmailBlockEditor
+  features={{
+    content: true,       // Block palette sidebar tab
+    rows: true,          // Layout presets sidebar tab
+    templates: false,    // Hide templates tab
+    treeView: false,     // Hide document tree
+    bodySettings: true,  // Global settings panel
+    preview: true,       // HTML preview
+    dragDrop: true,      // Drag-and-drop
+    customColors: true,  // Custom colors in palette
+  }}
+/>
+```
+
+All flags default to `true`. Set to `false` to hide.

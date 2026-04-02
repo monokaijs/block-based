@@ -1,0 +1,144 @@
+# Block Types
+
+Every block has a shared set of base properties plus type-specific fields.
+
+## Base Properties
+
+All blocks share these fields:
+
+```ts
+interface BaseBlock {
+  id: string;
+  type: EmailBlockType;
+  paddingTop: number;     // Default: 0
+  paddingBottom: number;
+  paddingLeft: number;
+  paddingRight: number;
+  marginTop: number;      // Default: 0
+  marginBottom: number;
+  marginLeft: number;
+  marginRight: number;
+  borderTopWidth: number; // Default: 0
+  borderBottomWidth: number;
+  borderLeftWidth: number;
+  borderRightWidth: number;
+  borderColor: string;
+  borderStyle: string;    // 'solid' | 'dashed' | 'dotted'
+  opacity: number;        // 0–100, default: 100
+}
+```
+
+## Heading
+
+```ts
+interface HeadingBlock extends BaseBlock {
+  type: 'heading';
+  content: string;
+  align: string;       // 'left' | 'center' | 'right'
+  color: string;
+  fontSize: number;    // Default: 28
+  fontWeight: number;  // Default: 700
+}
+```
+
+## Paragraph
+
+```ts
+interface ParagraphBlock extends BaseBlock {
+  type: 'paragraph';
+  content: string;
+  align: string;
+  color: string;
+  fontSize: number;    // Default: 16
+}
+```
+
+## Button
+
+```ts
+interface ButtonBlock extends BaseBlock {
+  type: 'button';
+  label: string;
+  url: string;
+  align: string;
+  widthMode: 'auto' | 'fixed' | 'percent';
+  widthPx: number;        // Used when widthMode is 'fixed'
+  widthPercent: number;    // Used when widthMode is 'percent'
+  backgroundColor: string;
+  textColor: string;
+  borderRadius: number;
+}
+```
+
+## Image
+
+```ts
+interface ImageBlock extends BaseBlock {
+  type: 'image';
+  src: string;
+  alt: string;
+  width: string;       // CSS width, e.g. '100%' or '300px'
+  align: string;
+}
+```
+
+## Divider
+
+```ts
+interface DividerBlock extends BaseBlock {
+  type: 'divider';
+  color: string;
+  thickness: number;
+}
+```
+
+## Spacer
+
+```ts
+interface SpacerBlock extends BaseBlock {
+  type: 'spacer';
+  height: number;
+  label: string;
+}
+```
+
+## Menu
+
+```ts
+interface MenuItem {
+  label: string;
+  url: string;
+}
+
+interface MenuBlock extends BaseBlock {
+  type: 'menu';
+  items: MenuItem[];
+  align: string;
+  color: string;
+  fontSize: number;
+  itemSpacing: number;
+}
+```
+
+## HTML (Raw)
+
+```ts
+interface HtmlBlock extends BaseBlock {
+  type: 'html';
+  content: string;   // Raw HTML string
+}
+```
+
+## Creating Blocks Programmatically
+
+Use `createBlock()` to create a normalized block with defaults:
+
+```tsx
+import { createBlock } from 'block-based';
+
+const heading = createBlock('heading');
+// { id: '...', type: 'heading', content: 'Heading', fontSize: 28, fontWeight: 700, ... }
+
+const button = createBlock('button');
+// { id: '...', type: 'button', label: 'Click me', url: '#', ... }
+```

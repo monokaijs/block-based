@@ -1,0 +1,116 @@
+# Document Model
+
+The email document is a plain JSON object. You can store it in any database, serialize it,
+or manipulate it programmatically.
+
+## EmailDocument
+
+```ts
+interface EmailDocument {
+  type: 'email';
+  settings: EmailDocumentSettings;
+  sections: EmailSection[];
+}
+```
+
+### Settings
+
+```ts
+interface EmailDocumentSettings {
+  // Layout
+  contentWidth: number;       // Default: 640
+  contentAlign: string;       // Default: 'center'
+  paddingTop: number;         // Default: 32
+  paddingBottom: number;      // Default: 32
+  paddingLeft: number;        // Default: 16
+  paddingRight: number;       // Default: 16
+  marginTop: number;
+  marginBottom: number;
+
+  // Typography
+  fontFamily: string;         // Default: "'Inter', 'Helvetica Neue', Arial, sans-serif"
+  fontWeight: number;         // Default: 400
+  fontSize: number;           // Default: 16
+
+  // Colors
+  backgroundColor: string;          // Default: '#f5f5f4'
+  contentBackgroundColor: string;    // Default: '#ffffff'
+  bodyTextColor: string;             // Default: '#1f2937'
+  linkColor: string;                 // Default: '#2563eb'
+  linkUnderline: boolean;            // Default: true
+
+  // Extras
+  preheaderText: string;
+  colorPalette: ColorPalette;
+  customColors: CustomColor[];
+}
+```
+
+## Sections
+
+Each section is a horizontal row of the email. Sections contain one or more columns.
+
+```ts
+interface EmailSection {
+  id: string;
+  columns: EmailColumn[];
+  backgroundColor: string;
+  paddingTop: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  paddingRight: number;
+  marginTop: number;
+  marginBottom: number;
+  borderTopWidth: number;
+  borderBottomWidth: number;
+  borderLeftWidth: number;
+  borderRightWidth: number;
+  borderColor: string;
+  borderStyle: string;
+}
+```
+
+## Columns
+
+Each column has a width (as a percentage string) and an array of blocks.
+
+```ts
+interface EmailColumn {
+  id: string;
+  width: string;     // e.g. '100%', '50%', '33.33%'
+  blocks: EmailBlock[];
+}
+```
+
+## Creating Documents
+
+```tsx
+import { createEmptyDocument, createLegacyHtmlDocument } from 'block-based';
+
+// Empty document with a default hero section
+const doc = createEmptyDocument();
+
+// Wrap existing raw HTML in a document
+const legacy = createLegacyHtmlDocument('<h1>Hello</h1>');
+```
+
+## Normalizing Documents
+
+If you load a document from storage that may be missing fields (e.g., saved with an older version),
+use `normalizeDocument()` to fill in defaults:
+
+```tsx
+import { normalizeDocument } from 'block-based';
+
+const doc = normalizeDocument(rawJsonFromDatabase);
+```
+
+## Type Guard
+
+```tsx
+import { isEmailDocument } from 'block-based';
+
+if (isEmailDocument(value)) {
+  // value is EmailDocument
+}
+```

@@ -1,0 +1,83 @@
+# Sections & Layouts
+
+Sections are horizontal rows in the email document. Each section contains one or more columns,
+and each column contains an array of blocks.
+
+## Layout Presets
+
+The editor's **Rows** sidebar tab provides built-in layout presets:
+
+| Preset | Columns | Width Ratios |
+|--------|---------|--------------|
+| 1 column | 1 | 100% |
+| 2 columns | 2 | 50% / 50% |
+| 3 columns | 3 | 33.33% each |
+| 4 columns | 4 | 25% each |
+| Sidebar left | 2 | 35% / 65% |
+| Sidebar right | 2 | 65% / 35% |
+
+## Creating Sections Programmatically
+
+Use `createSectionTemplate()` to generate pre-built sections:
+
+```tsx
+import { createSectionTemplate } from 'block-based';
+
+// Hero section with heading + paragraph + button
+const hero = createSectionTemplate('hero');
+
+// Empty single column
+const blank = createSectionTemplate('blank');
+
+// Two equal columns with placeholder content
+const twoCols = createSectionTemplate('two-column');
+
+// Call-to-action section with colored background
+const cta = createSectionTemplate('cta');
+```
+
+## Appending Sections to a Document
+
+```tsx
+import { appendGeneratedSections } from 'block-based';
+
+const updatedDoc = appendGeneratedSections(doc, [
+  createSectionTemplate('hero'),
+  createSectionTemplate('two-column'),
+]);
+```
+
+## Custom Section Input
+
+For full control, use `normalizeSection()` with a partial input:
+
+```tsx
+import { normalizeSection, createBlock } from 'block-based';
+
+const section = normalizeSection({
+  columns: [
+    {
+      width: '60%',
+      blocks: [createBlock('heading'), createBlock('paragraph')],
+    },
+    {
+      width: '40%',
+      blocks: [createBlock('image')],
+    },
+  ],
+  backgroundColor: '#f0f9ff',
+  paddingTop: 32,
+  paddingBottom: 32,
+});
+```
+
+The normalizer fills in missing IDs and default values automatically.
+
+## Section Properties
+
+Each section supports:
+
+- **Background color** — per-section background
+- **Padding** — top, bottom, left, right
+- **Margin** — top, bottom
+- **Borders** — width, color, and style per side

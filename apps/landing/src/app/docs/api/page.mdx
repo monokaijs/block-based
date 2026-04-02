@@ -1,0 +1,220 @@
+# API Reference
+
+Complete listing of all exports from `block-based`.
+
+## Components
+
+### `EmailBlockEditor`
+
+```tsx
+import { EmailBlockEditor } from 'block-based';
+```
+
+React component — the main email editor. See [EmailBlockEditor docs](/docs/editor) for props.
+
+---
+
+## Rendering
+
+### `renderEmailDocument(doc: EmailDocument): string`
+
+Converts a document to table-based, email-client-safe HTML.
+
+```tsx
+import { renderEmailDocument } from 'block-based';
+const html = renderEmailDocument(doc);
+```
+
+---
+
+## Document Functions
+
+### `createEmptyDocument(): EmailDocument`
+
+Creates a blank document with default settings and a hero section.
+
+### `createLegacyHtmlDocument(html?: string): EmailDocument`
+
+Wraps raw HTML in a single-section document.
+
+### `isEmailDocument(value: unknown): value is EmailDocument`
+
+Type guard that checks if a value is a valid `EmailDocument`.
+
+### `normalizeDocument(input: unknown): EmailDocument`
+
+Fills missing fields with defaults. Handles backward compatibility with older document formats.
+
+---
+
+## Block Functions
+
+### `createBlock(type: EmailBlockType): EmailBlock`
+
+Creates a new block of the given type with default values and a generated ID.
+
+```tsx
+import { createBlock } from 'block-based';
+
+const heading = createBlock('heading');
+const button = createBlock('button');
+```
+
+### `normalizeBlock(block: Partial<EmailBlock>): EmailBlock`
+
+Fills missing fields on a partial block.
+
+### `renderBlock(block: EmailBlock, settings: EmailDocumentSettings): string`
+
+Renders a single block to HTML.
+
+---
+
+## Section Functions
+
+### `createSectionTemplate(type: string): EmailSection`
+
+Creates a pre-built section. Available types: `'hero'`, `'blank'`, `'two-column'`, `'cta'`.
+
+### `normalizeSection(input: Partial<EmailSection>): EmailSection`
+
+Fills missing fields on a partial section.
+
+### `normalizeColumn(input: Partial<EmailColumn>): EmailColumn`
+
+Fills missing fields on a partial column.
+
+### `appendGeneratedSections(doc: EmailDocument, sections: EmailSection[]): EmailDocument`
+
+Returns a new document with the given sections appended.
+
+---
+
+## Utilities
+
+### `nextId(prefix?: string): string`
+
+Generates a unique ID string. Optionally prefixed.
+
+### `escapeHtml(value: string): string`
+
+HTML entity escapes a string (for safe rendering in templates).
+
+### `blockPadding(block: EmailBlock): string`
+
+Returns a CSS padding shorthand string for a block.
+
+---
+
+## Types
+
+### Core Types
+
+```ts
+type EmailBlockType =
+  | 'heading' | 'paragraph' | 'button' | 'image'
+  | 'divider' | 'spacer' | 'menu' | 'html';
+
+type EmailBlock =
+  | HeadingBlock | ParagraphBlock | ButtonBlock | ImageBlock
+  | DividerBlock | SpacerBlock | MenuBlock | HtmlBlock;
+
+interface EmailColumn {
+  id: string;
+  width: string;
+  blocks: EmailBlock[];
+}
+
+interface EmailSection {
+  id: string;
+  columns: EmailColumn[];
+  backgroundColor: string;
+  paddingTop: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  paddingRight: number;
+  marginTop: number;
+  marginBottom: number;
+  borderTopWidth: number;
+  borderBottomWidth: number;
+  borderLeftWidth: number;
+  borderRightWidth: number;
+  borderColor: string;
+  borderStyle: string;
+}
+
+interface EmailDocument {
+  type: 'email';
+  settings: EmailDocumentSettings;
+  sections: EmailSection[];
+}
+```
+
+### Color Palette
+
+```ts
+interface ColorPalette {
+  background: string;
+  foreground: string;
+  card: string;
+  cardForeground: string;
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  accent: string;
+  accentForeground: string;
+  muted: string;
+  mutedForeground: string;
+  destructive: string;
+  destructiveForeground: string;
+  border: string;
+  input: string;
+  ring: string;
+}
+
+interface CustomColor {
+  label: string;
+  value: string;
+}
+```
+
+### Editor Customization
+
+```ts
+interface SampleBlock {
+  label: string;
+  description?: string;
+  icon?: string;
+  create: () => EmailBlock;
+}
+
+interface TemplateDefinition {
+  label: string;
+  description?: string;
+  sections: EmailSectionInput[];
+}
+
+interface CustomTab {
+  id: string;
+  label: string;
+  icon?: string;
+  render: (ctx: CustomTabContext) => React.ReactNode;
+}
+
+interface CustomTabContext {
+  document: EmailDocument;
+  onChange: (doc: EmailDocument) => void;
+}
+
+interface EditorFeatures {
+  content: boolean;
+  rows: boolean;
+  templates: boolean;
+  treeView: boolean;
+  bodySettings: boolean;
+  preview: boolean;
+  dragDrop: boolean;
+  customColors: boolean;
+}
+```

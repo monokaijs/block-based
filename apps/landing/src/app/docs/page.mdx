@@ -1,0 +1,65 @@
+# Getting Started
+
+**block-based** is a composable, block-based email editor component for React. It lets you design
+email-client-safe HTML emails visually and export them with a single function call.
+
+## Installation
+
+```bash
+npm install block-based
+```
+
+Peer dependencies — make sure these are already in your project:
+
+```bash
+npm install react react-dom lucide-react
+```
+
+## Quick Start
+
+```tsx
+import { EmailBlockEditor, renderEmailDocument, createEmptyDocument } from 'block-based';
+import { useState } from 'react';
+
+export function App() {
+  const [doc, setDoc] = useState(createEmptyDocument);
+
+  return (
+    <div>
+      <EmailBlockEditor value={doc} onChange={setDoc} height="600px" />
+      <button onClick={() => {
+        const html = renderEmailDocument(doc);
+        console.log(html);
+      }}>
+        Export HTML
+      </button>
+    </div>
+  );
+}
+```
+
+That's it — you have a fully functional email editor. The `doc` state is a plain JSON object
+that you can persist to any database, and `renderEmailDocument()` converts it to table-based,
+email-client-safe HTML.
+
+## What's Included
+
+| Feature | Description |
+|---------|-------------|
+| **8 block types** | Heading, Paragraph, Button, Image, Divider, Spacer, Menu, HTML |
+| **Multi-column layouts** | 1–4 column sections with flexible width ratios |
+| **Drag & drop** | Reorder blocks and sections via dnd-kit |
+| **Visual inspector** | Edit typography, colors, padding, margins, borders |
+| **Responsive preview** | Desktop, tablet, and mobile view modes |
+| **HTML export** | Table-based, email-client-safe output |
+| **Color palette** | Semantic color system with custom color support |
+| **Templates** | Pre-built section templates (hero, CTA, two-column) |
+
+## Next Steps
+
+- [EmailBlockEditor](/docs/editor) — editor component props and configuration
+- [Rendering HTML](/docs/rendering) — exporting email-safe HTML
+- [Document Model](/docs/document-model) — understanding the JSON document structure
+- [Block Types](/docs/blocks) — available blocks and their properties
+- [Customization](/docs/customization) — custom blocks, tabs, templates, and feature flags
+- [API Reference](/docs/api) — full API listing
