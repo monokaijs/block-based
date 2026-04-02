@@ -37,14 +37,6 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', height: 40, background: '#18181b', padding: '0 16px', gap: 12, flexShrink: 0 }}>
-        <div style={{ flex: 1 }} />
-        <button style={tabStyle('editor')} onClick={() => setActiveTab('editor')}>Editor</button>
-        <button style={tabStyle('json')} onClick={() => setActiveTab('json')}>JSON</button>
-        <button style={tabStyle('html')} onClick={() => setActiveTab('html')}>HTML Output</button>
-      </div>
-
       {/* Editor pane */}
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'editor' ? 'flex' : 'none', flexDirection: 'column' }}>
         <EmailBlockEditor value={doc} onChange={handleChange} height="100%" />
