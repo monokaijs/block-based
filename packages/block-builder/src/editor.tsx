@@ -49,6 +49,7 @@ import {
   Menu as MenuIcon,
   MessageSquare,
   MinusSquare,
+  Moon,
   MousePointerClick,
   MoveVertical,
   GripVertical,
@@ -59,6 +60,7 @@ import {
   Search,
   SeparatorHorizontal,
   Smartphone,
+  Sun,
   Tablet,
   Trash2,
   Type as TypeIcon,
@@ -235,6 +237,9 @@ export interface EmailBlockEditorProps {
 
   /** Feature flags to enable/disable capabilities (all default true). */
   features?: Partial<EditorFeatures>;
+
+  /** Called when the user toggles the theme from within the editor. */
+  onThemeChange?: (theme: EditorThemeMode) => void;
 }
 
 // ─── Document update helpers ──────────────────────────────────────────────────
@@ -3697,6 +3702,8 @@ function Sidebar({
   userTemplates,
   customTabs,
   features,
+  themeMode,
+  onThemeChange,
 }: {
   activeTab: SidebarTab;
   onTabChange: (t: SidebarTab) => void;
@@ -3713,6 +3720,8 @@ function Sidebar({
   userTemplates?: TemplateDefinition[];
   customTabs?: CustomTab[];
   features: EditorFeatures;
+  themeMode: EditorThemeMode;
+  onThemeChange?: (theme: EditorThemeMode) => void;
 }) {
   const C = useT();
   const shellStyle: React.CSSProperties = {
@@ -3774,17 +3783,45 @@ function Sidebar({
   const renderShell = (title: string, body: React.ReactNode) => (
     <div style={shellStyle}>
       <div style={railStyle}>
-        {navItems.map((item) => (
-          <RailItem
-            key={item.id}
-            label={item.label}
-            Icon={item.Icon}
-            active={activeTab === item.id}
-            onClick={() => {
-              onTabChange(item.id);
+        <div style={{ flex: 1 }}>
+          {navItems.map((item) => (
+            <RailItem
+              key={item.id}
+              label={item.label}
+              Icon={item.Icon}
+              active={activeTab === item.id}
+              onClick={() => {
+                onTabChange(item.id);
+              }}
+            />
+          ))}
+        </div>
+        {onThemeChange && (
+          <button
+            onClick={() => onThemeChange(themeMode === 'light' ? 'dark' : 'light')}
+            title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              width: '100%',
+              minHeight: 76,
+              padding: '12px 8px',
+              border: 'none',
+              borderTop: `1px solid ${C.border}`,
+              background: C.bgSubtle,
+              color: C.textSecondary,
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 600,
             }}
-          />
-        ))}
+          >
+            {themeMode === 'light' ? <Moon size={18} strokeWidth={2} /> : <Sun size={18} strokeWidth={2} />}
+            <span>{themeMode === 'light' ? 'Dark' : 'Light'}</span>
+          </button>
+        )}
       </div>
       <div style={contentPanelStyle}>
         <div style={panelHeaderStyle}>
@@ -4617,6 +4654,7 @@ export function EmailBlockEditor({
   templates: userTemplates,
   customTabs,
   features: featureOverrides,
+  onThemeChange,
 }: EmailBlockEditorProps) {
   const themeTokens = getTheme(themeMode);
   const features: EditorFeatures = { ...DEFAULT_FEATURES, ...featureOverrides };
@@ -5218,6 +5256,8 @@ export function EmailBlockEditor({
             userTemplates={userTemplates}
             customTabs={customTabs}
             features={features}
+            themeMode={themeMode}
+            onThemeChange={onThemeChange}
           />
           </ResizablePanel>
         )}
