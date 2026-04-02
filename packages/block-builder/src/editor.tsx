@@ -52,8 +52,11 @@ import {
   MousePointerClick,
   MoveVertical,
   GripVertical,
+  Paintbrush,
+  Pencil,
   Plus,
   Rows4,
+  Search,
   SeparatorHorizontal,
   Smartphone,
   Tablet,
@@ -592,6 +595,396 @@ function PaletteColorPicker({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Color Palette Dialog ────────────────────────────────────────────────────
+
+function ColorPaletteSection({
+  doc,
+  onUpdateSettings,
+}: {
+  doc: EmailDocument;
+  onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const allColors = [
+    ...COLOR_PALETTE_KEYS.map((k) => doc.settings.colorPalette[k]),
+    ...doc.settings.customColors.map((cc) => cc.value),
+  ];
+  // Show up to 17 swatches in a compact grid
+  const previewColors = allColors.slice(0, 17);
+  const extraCount = allColors.length - previewColors.length;
+
+  return (
+    <InspectorSection
+      title="Color Palette"
+      rightSlot={
+        <button
+          onClick={() => setDialogOpen(true)}
+          style={{
+            padding: '3px 8px',
+            border: `1px solid ${C.inspectorBorder}`,
+            borderRadius: 5,
+            background: '#fafafa',
+            color: '#52525b',
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <Pencil size={10} /> Manage
+        </button>
+      }
+    >
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {previewColors.map((color, i) => (
+          <div
+            key={i}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 5,
+              background: color,
+              border: `1px solid ${C.inspectorBorder}`,
+              cursor: 'pointer',
+            }}
+            title={color}
+            onClick={() => setDialogOpen(true)}
+          />
+        ))}
+        {extraCount > 0 && (
+          <div
+            onClick={() => setDialogOpen(true)}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 5,
+              border: `1px solid ${C.inspectorBorder}`,
+              background: '#f4f4f5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 9,
+              fontWeight: 700,
+              color: '#71717a',
+              cursor: 'pointer',
+            }}
+          >
+            +{extraCount}
+          </div>
+        )}
+      </div>
+      {dialogOpen && (
+        <ColorPaletteDialog
+          palette={doc.settings.colorPalette}
+          customColors={doc.settings.customColors}
+          onUpdatePalette={(p) => onUpdateSettings({ colorPalette: p })}
+          onUpdateCustomColors={(c) => onUpdateSettings({ customColors: c })}
+          onClose={() => setDialogOpen(false)}
+        />
+      )}
+    </InspectorSection>
+  );
+}
+
+const PALETTE_GROUPS: Array<{ label: string; keys: (keyof ColorPalette)[] }> = [
+  { label: 'Base', keys: ['background', 'foreground'] },
+  { label: 'Card', keys: ['card', 'cardForeground'] },
+  { label: 'Primary', keys: ['primary', 'primaryForeground'] },
+  { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] },
+  { label: 'Accent', keys: ['accent', 'accentForeground'] },
+  { label: 'Muted', keys: ['muted', 'mutedForeground'] },
+  { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] },
+  { label: 'Borders', keys: ['border', 'input', 'ring'] },
+];
+
+function ColorPaletteDialog({
+  palette,
+  customColors,
+  onUpdatePalette,
+  onUpdateCustomColors,
+  onClose,
+}: {
+  palette: ColorPalette;
+  customColors: CustomColor[];
+  onUpdatePalette: (palette: ColorPalette) => void;
+  onUpdateCustomColors: (colors: CustomColor[]) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const query = search.toLowerCase().trim();
+
+  const filteredGroups = PALETTE_GROUPS.map((g) => ({
+    ...g,
+    keys: g.keys.filter((k) => {
+      if (!query) return true;
+      return (
+        COLOR_PALETTE_LABELS[k].toLowerCase().includes(query) ||
+        palette[k].toLowerCase().includes(query) ||
+        k.toLowerCase().includes(query)
+      );
+    }),
+  })).filter((g) => g.keys.length > 0);
+
+  const filteredCustom = customColors.filter((cc) => {
+    if (!query) return true;
+    return (
+      cc.label.toLowerCase().includes(query) ||
+      cc.value.toLowerCase().includes(query)
+    );
+  });
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backdropFilter: 'blur(2px)',
+      }}
+    >
+      <div
+        style={{
+          width: 520,
+          maxHeight: '80vh',
+          background: '#ffffff',
+          borderRadius: 12,
+          boxShadow: '0 20px 60px rgba(0,0,0,.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', borderBottom: `1px solid ${C.inspectorBorder}` }}>
+          <Paintbrush size={18} style={{ color: C.accent }} />
+          <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#18181b' }}>Color Palette</div>
+          <button
+            onClick={onClose}
+            style={{ width: 28, height: 28, border: 'none', borderRadius: 6, background: '#f4f4f5', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '12px 20px 8px', position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 32, top: 23, color: '#a1a1aa', pointerEvents: 'none' }} />
+          <input
+            style={{ ...inputStyle, paddingLeft: 30, width: '100%', fontSize: 13 }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search colors..."
+            autoFocus
+          />
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px' }}>
+          {filteredGroups.map(({ label, keys }) => (
+            <div key={label} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                {label}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>
+                {keys.map((key) => {
+                  const color = palette[key];
+                  const name = COLOR_PALETTE_LABELS[key];
+                  const isEditing = editingKey === key;
+                  const isHovered = hoveredKey === key;
+                  return (
+                    <div
+                      key={key}
+                      onMouseEnter={() => setHoveredKey(key)}
+                      onMouseLeave={() => setHoveredKey(null)}
+                      style={{
+                        position: 'relative',
+                        borderRadius: 8,
+                        border: `1px solid ${isHovered ? C.accent : C.inspectorBorder}`,
+                        background: isHovered ? '#f8faff' : '#fafafa',
+                        padding: 8,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      onClick={() => setEditingKey(isEditing ? null : key)}
+                    >
+                      <div style={{
+                        width: '100%',
+                        height: 32,
+                        borderRadius: 5,
+                        background: color,
+                        border: `1px solid ${C.inspectorBorder}`,
+                        marginBottom: 6,
+                      }} />
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#18181b', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {name}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#a1a1aa', fontFamily: 'monospace' }}>
+                        {color}
+                      </div>
+                      {isEditing && (
+                        <div style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="color"
+                            value={color}
+                            onChange={(e) => onUpdatePalette({ ...palette, [key]: e.target.value })}
+                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
+                          />
+                          <input
+                            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+                            value={color}
+                            onChange={(e) => onUpdatePalette({ ...palette, [key]: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Custom Colors */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Custom Colors
+              </div>
+              <button
+                onClick={() => {
+                  const newColor: CustomColor = { id: nextId('cc'), label: 'Custom', value: '#6366f1' };
+                  onUpdateCustomColors([...customColors, newColor]);
+                }}
+                style={{
+                  padding: '3px 8px',
+                  border: `1px solid ${C.inspectorBorder}`,
+                  borderRadius: 5,
+                  background: '#fafafa',
+                  color: '#52525b',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <Plus size={11} /> Add
+              </button>
+            </div>
+            {filteredCustom.length === 0 && customColors.length === 0 && (
+              <div style={{ fontSize: 12, color: '#a1a1aa', padding: '12px 0', textAlign: 'center' }}>
+                No custom colors yet. Add one to get started.
+              </div>
+            )}
+            {filteredCustom.length === 0 && customColors.length > 0 && query && (
+              <div style={{ fontSize: 12, color: '#a1a1aa', padding: '12px 0', textAlign: 'center' }}>
+                No matching custom colors.
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>
+              {filteredCustom.map((cc, idx) => {
+                const realIdx = customColors.findIndex((c) => c.id === cc.id);
+                const isEditing = editingKey === `custom-${cc.id}`;
+                const isHovered = hoveredKey === `custom-${cc.id}`;
+                return (
+                  <div
+                    key={cc.id}
+                    onMouseEnter={() => setHoveredKey(`custom-${cc.id}`)}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    style={{
+                      position: 'relative',
+                      borderRadius: 8,
+                      border: `1px solid ${isHovered ? C.accent : C.inspectorBorder}`,
+                      background: isHovered ? '#f8faff' : '#fafafa',
+                      padding: 8,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                    onClick={() => setEditingKey(isEditing ? null : `custom-${cc.id}`)}
+                  >
+                    <div style={{
+                      width: '100%',
+                      height: 32,
+                      borderRadius: 5,
+                      background: cc.value,
+                      border: `1px solid ${C.inspectorBorder}`,
+                      marginBottom: 6,
+                    }} />
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#18181b', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {cc.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#a1a1aa', fontFamily: 'monospace' }}>
+                      {cc.value}
+                    </div>
+                    {isEditing && (
+                      <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          style={{ ...inputStyle, fontSize: 11 }}
+                          value={cc.label}
+                          onChange={(e) => {
+                            const updated = [...customColors];
+                            updated[realIdx] = { ...cc, label: e.target.value };
+                            onUpdateCustomColors(updated);
+                          }}
+                          placeholder="Color name"
+                        />
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          <input
+                            type="color"
+                            value={cc.value}
+                            onChange={(e) => {
+                              const updated = [...customColors];
+                              updated[realIdx] = { ...cc, value: e.target.value };
+                              onUpdateCustomColors(updated);
+                            }}
+                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, cursor: 'pointer', padding: 1, background: 'none', flexShrink: 0 }}
+                          />
+                          <input
+                            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', fontSize: 11 }}
+                            value={cc.value}
+                            onChange={(e) => {
+                              const updated = [...customColors];
+                              updated[realIdx] = { ...cc, value: e.target.value };
+                              onUpdateCustomColors(updated);
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const updated = customColors.filter((_, i) => i !== realIdx);
+                              onUpdateCustomColors(updated);
+                              setEditingKey(null);
+                            }}
+                            title="Remove"
+                            style={{ width: 24, height: 24, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3958,98 +4351,10 @@ function BodySettingsPanel({
           </Field>
         </InspectorSection>
 
-        <InspectorSection title="Color Palette">
-          {(
-            [
-              { label: 'Base', keys: ['background', 'foreground'] as (keyof ColorPalette)[] },
-              { label: 'Card', keys: ['card', 'cardForeground'] as (keyof ColorPalette)[] },
-              { label: 'Primary', keys: ['primary', 'primaryForeground'] as (keyof ColorPalette)[] },
-              { label: 'Secondary', keys: ['secondary', 'secondaryForeground'] as (keyof ColorPalette)[] },
-              { label: 'Accent', keys: ['accent', 'accentForeground'] as (keyof ColorPalette)[] },
-              { label: 'Muted', keys: ['muted', 'mutedForeground'] as (keyof ColorPalette)[] },
-              { label: 'Destructive', keys: ['destructive', 'destructiveForeground'] as (keyof ColorPalette)[] },
-              { label: 'Borders', keys: ['border', 'input', 'ring'] as (keyof ColorPalette)[] },
-            ] as const
-          ).map(({ label, keys }) => (
-            <div key={label} style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-              {keys.map((key) => (
-                <Field key={key} label={COLOR_PALETTE_LABELS[key]}>
-                  <ColorInput
-                    value={doc.settings.colorPalette[key]}
-                    onChange={(v) =>
-                      onUpdateSettings({ colorPalette: { ...doc.settings.colorPalette, [key]: v } })
-                    }
-                  />
-                </Field>
-              ))}
-            </div>
-          ))}
-        </InspectorSection>
-
-        <InspectorSection title="Custom Colors">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {doc.settings.customColors.map((cc, idx) => (
-              <div key={cc.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Name</div>
-                  <input
-                    style={{ ...inputStyle, width: '100%' }}
-                    value={cc.label}
-                    onChange={(e) => {
-                      const updated = [...doc.settings.customColors];
-                      updated[idx] = { ...cc, label: e.target.value };
-                      onUpdateSettings({ customColors: updated });
-                    }}
-                    placeholder="Color name"
-                  />
-                </div>
-                <div style={{ width: 80 }}>
-                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 2 }}>Value</div>
-                  <ColorInput
-                    value={cc.value}
-                    onChange={(v) => {
-                      const updated = [...doc.settings.customColors];
-                      updated[idx] = { ...cc, value: v };
-                      onUpdateSettings({ customColors: updated });
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    const updated = doc.settings.customColors.filter((_, i) => i !== idx);
-                    onUpdateSettings({ customColors: updated });
-                  }}
-                  title="Remove color"
-                  style={{ width: 28, height: 28, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: C.danger, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                const newColor: CustomColor = { id: nextId('cc'), label: 'Custom', value: '#6366f1' };
-                onUpdateSettings({ customColors: [...doc.settings.customColors, newColor] });
-              }}
-              style={{
-                padding: '6px 12px',
-                border: `1px dashed ${C.inspectorBorder}`,
-                borderRadius: 6,
-                background: '#fafafa',
-                color: '#52525b',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <Plus size={12} /> Add Custom Color
-            </button>
-          </div>
-        </InspectorSection>
+        <ColorPaletteSection
+          doc={doc}
+          onUpdateSettings={onUpdateSettings}
+        />
 
         <InspectorSection title="Layout">
           <Field label="Background Color">
