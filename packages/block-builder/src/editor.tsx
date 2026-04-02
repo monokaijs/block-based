@@ -59,6 +59,7 @@ import {
   Tablet,
   Trash2,
   Type as TypeIcon,
+  X,
   type LucideProps,
 } from 'lucide-react';
 import type {
@@ -1265,10 +1266,12 @@ function BlockInspectorPanel({
   block,
   onUpdate,
   onDelete,
+  onClose,
 }: {
   block: EmailBlock;
   onUpdate: (patch: Partial<EmailBlock>) => void;
   onDelete: () => void;
+  onClose?: () => void;
 }) {
   const label: Record<EmailBlockType, string> = {
     heading: 'Heading',
@@ -1283,8 +1286,13 @@ function BlockInspectorPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13, color: '#18181b' }}>
-        {label[block.type]} Block
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13, color: '#18181b', display: 'flex', alignItems: 'center' }}>
+        <span style={{ flex: 1 }}>{label[block.type]} Block</span>
+        {onClose && (
+          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: '#71717a', cursor: 'pointer', flexShrink: 0 }}>
+            <X size={12} />
+          </button>
+        )}
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {block.type === 'heading' && <HeadingInspector block={block} onUpdate={onUpdate as any} />}
@@ -1307,17 +1315,24 @@ function SectionInspectorPanel({
   section,
   onUpdate,
   onDelete,
+  onClose,
 }: {
   section: EmailSection;
   onUpdate: (patch: Partial<EmailSection>) => void;
   onDelete: () => void;
+  onClose?: () => void;
 }) {
   const currentLayout = section.columns.map((column) => Math.round(column.width));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13 }}>
-        Row
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.inspectorBorder}`, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+        <span style={{ flex: 1 }}>Row</span>
+        {onClose && (
+          <button onClick={onClose} title="Close" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, border: `1px solid ${C.inspectorBorder}`, borderRadius: 4, background: '#fff', color: '#71717a', cursor: 'pointer', flexShrink: 0 }}>
+            <X size={12} />
+          </button>
+        )}
       </div>
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <InspectorSection title="Columns">
@@ -1534,6 +1549,7 @@ function SortableBlockItem({
   isSelected,
   isDimmed,
   onSelect,
+  onContextMenu,
 }: {
   block: EmailBlock;
   sectionId: string;
@@ -1542,6 +1558,7 @@ function SortableBlockItem({
   isSelected: boolean;
   isDimmed: boolean;
   onSelect: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
@@ -1563,6 +1580,7 @@ function SortableBlockItem({
       }}
       {...attributes}
       {...listeners}
+      onContextMenu={onContextMenu}
     >
       <BlockPreview
         block={block}
@@ -2010,6 +2028,7 @@ function ColumnCard({
   showBlockDelete = false,
   selectedBlockId,
   onDeleteBlock,
+  onBlockContextMenu,
 }: {
   column: EmailColumn;
   section: EmailSection;
@@ -2022,6 +2041,7 @@ function ColumnCard({
   showBlockDelete?: boolean;
   selectedBlockId?: string;
   onDeleteBlock?: (sId: string, cId: string, bId: string) => void;
+  onBlockContextMenu?: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column:${section.id}:${column.id}`,
@@ -2095,6 +2115,7 @@ function ColumnCard({
                     )
                   }
                   onSelect={() => onSelectBlock({ type: 'block', sectionId: section.id, columnId: column.id, blockId: block.id })}
+                  onContextMenu={onBlockContextMenu ? (e) => onBlockContextMenu(e, section.id, column.id, block.id, blockIndex, column.blocks.length, (block as any).align) : undefined}
                 />
                 {showBlockDelete && isBlockSelected && selectedBlockId === block.id && onDeleteBlock && (
                   <FloatingDeleteButton onClick={() => onDeleteBlock(section.id, column.id, block.id)} />
@@ -2146,6 +2167,8 @@ function SectionCard({
   showBlockDelete = false,
   selectedBlockId,
   onDeleteBlock,
+  onBlockContextMenu,
+  onSectionContextMenu,
 }: {
   section: EmailSection;
   index: number;
@@ -2166,6 +2189,8 @@ function SectionCard({
   showBlockDelete?: boolean;
   selectedBlockId?: string;
   onDeleteBlock?: (sId: string, cId: string, bId: string) => void;
+  onBlockContextMenu?: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
+  onSectionContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const isSectionSelected = selection?.type === 'section' && selection.sectionId === section.id;
@@ -2191,6 +2216,7 @@ function SectionCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={(e) => { e.stopPropagation(); onSelectSection(section.id); }}
+      onContextMenu={!previewEnabled ? onSectionContextMenu : undefined}
     >
       {/* Section toolbar */}
       {!previewEnabled && (hovered || isSectionSelected) && (
@@ -2230,6 +2256,7 @@ function SectionCard({
             showBlockDelete={showBlockDelete}
             selectedBlockId={selectedBlockId}
             onDeleteBlock={onDeleteBlock}
+            onBlockContextMenu={onBlockContextMenu}
           />
         ))}
       </div>
@@ -3498,6 +3525,165 @@ function DeviceToggle({
   );
 }
 
+// ─── Context menu ─────────────────────────────────────────────────────────────
+
+type ContextMenuAction =
+  | { kind: 'delete' }
+  | { kind: 'moveUp' }
+  | { kind: 'moveDown' }
+  | { kind: 'align'; value: 'left' | 'center' | 'right' };
+
+type ContextMenuState = {
+  x: number;
+  y: number;
+  target:
+    | { type: 'block'; sectionId: string; columnId: string; blockId: string; blockIndex: number; totalBlocks: number; currentAlign?: string }
+    | { type: 'section'; sectionId: string; sectionIndex: number; totalSections: number };
+} | null;
+
+function ContextMenuOverlay({
+  menu,
+  onAction,
+  onClose,
+}: {
+  menu: NonNullable<ContextMenuState>;
+  onAction: (action: ContextMenuAction) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const isBlock = menu.target.type === 'block';
+  const canMoveUp = menu.target.type === 'block' ? menu.target.blockIndex > 0 : menu.target.sectionIndex > 0;
+  const canMoveDown = menu.target.type === 'block'
+    ? menu.target.blockIndex < menu.target.totalBlocks - 1
+    : menu.target.type === 'section' ? menu.target.sectionIndex < menu.target.totalSections - 1 : false;
+  const currentAlign = menu.target.type === 'block' ? menu.target.currentAlign : undefined;
+
+  const itemStyle = (disabled = false): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '6px 12px',
+    border: 'none',
+    background: 'transparent',
+    color: disabled ? '#d4d4d8' : '#27272a',
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 12,
+    fontWeight: 500,
+    textAlign: 'left',
+    borderRadius: 4,
+  });
+
+  const dangerItemStyle: React.CSSProperties = {
+    ...itemStyle(),
+    color: C.danger,
+  };
+
+  const alignBtnStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    border: `1px solid ${active ? C.accent : C.inspectorBorder}`,
+    borderRadius: 4,
+    background: active ? `${C.accent}14` : '#fff',
+    color: active ? C.accent : '#52525b',
+    cursor: 'pointer',
+  });
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999 }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div
+        ref={ref}
+        style={{
+          position: 'absolute',
+          left: menu.x,
+          top: menu.y,
+          minWidth: 180,
+          background: '#ffffff',
+          border: `1px solid ${C.inspectorBorder}`,
+          borderRadius: 8,
+          boxShadow: '0 4px 20px rgba(0,0,0,.14)',
+          padding: 4,
+          zIndex: 10000,
+        }}
+      >
+        <button
+          style={itemStyle(!canMoveUp)}
+          disabled={!canMoveUp}
+          onMouseEnter={(e) => { if (canMoveUp) (e.currentTarget.style.background = '#f4f4f5'); }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          onClick={() => { if (canMoveUp) onAction({ kind: 'moveUp' }); }}
+        >
+          <ChevronUp size={14} /> Move Up
+        </button>
+        <button
+          style={itemStyle(!canMoveDown)}
+          disabled={!canMoveDown}
+          onMouseEnter={(e) => { if (canMoveDown) (e.currentTarget.style.background = '#f4f4f5'); }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          onClick={() => { if (canMoveDown) onAction({ kind: 'moveDown' }); }}
+        >
+          <ChevronDown size={14} /> Move Down
+        </button>
+
+        {isBlock && (
+          <>
+            <div style={{ height: 1, background: C.inspectorBorder, margin: '4px 0' }} />
+            <div style={{ padding: '4px 12px', fontSize: 11, color: '#a1a1aa', fontWeight: 600 }}>Alignment</div>
+            <div style={{ display: 'flex', gap: 4, padding: '4px 12px' }}>
+              <button
+                style={alignBtnStyle(currentAlign === 'left')}
+                title="Align Left"
+                onClick={() => onAction({ kind: 'align', value: 'left' })}
+              >
+                <AlignLeft size={14} />
+              </button>
+              <button
+                style={alignBtnStyle(currentAlign === 'center')}
+                title="Align Center"
+                onClick={() => onAction({ kind: 'align', value: 'center' })}
+              >
+                <AlignCenter size={14} />
+              </button>
+              <button
+                style={alignBtnStyle(currentAlign === 'right')}
+                title="Align Right"
+                onClick={() => onAction({ kind: 'align', value: 'right' })}
+              >
+                <AlignRight size={14} />
+              </button>
+            </div>
+          </>
+        )}
+
+        <div style={{ height: 1, background: C.inspectorBorder, margin: '4px 0' }} />
+        <button
+          style={dangerItemStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          onClick={() => onAction({ kind: 'delete' })}
+        >
+          <Trash2 size={14} /> Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FloatingDeleteButton({ onClick }: { onClick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
@@ -3582,6 +3768,8 @@ function Canvas({
   onAddRowAt,
   onMoveSectionToIndex,
   onClearSelection,
+  onBlockContextMenu,
+  onSectionContextMenu,
 }: {
   doc: EmailDocument;
   selection: Selection;
@@ -3601,6 +3789,8 @@ function Canvas({
   onAddRowAt: (index: number, widths: number[]) => void;
   onMoveSectionToIndex: (sectionId: string, toIndex: number) => void;
   onClearSelection: () => void;
+  onBlockContextMenu: (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => void;
+  onSectionContextMenu: (e: React.MouseEvent, sectionId: string, sectionIndex: number, totalSections: number) => void;
 }) {
   const isMobilePreview = viewMode === 'mobile';
   const isTabletPreview = viewMode === 'tablet';
@@ -3667,6 +3857,8 @@ function Canvas({
                   showBlockDelete={!previewEnabled && selection?.type === 'block' && selection.sectionId === section.id}
                   selectedBlockId={selection?.type === 'block' ? selection.blockId : undefined}
                   onDeleteBlock={onDeleteBlock}
+                  onBlockContextMenu={!previewEnabled ? onBlockContextMenu : undefined}
+                  onSectionContextMenu={!previewEnabled ? (e: React.MouseEvent) => onSectionContextMenu(e, section.id, index, doc.sections.length) : undefined}
                 />
                 {/* Add row buttons on selected row */}
                 {isSectionSelected && (
@@ -3922,13 +4114,9 @@ function RightInspector({
   onClearSelection: () => void;
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
 }) {
-  let title = 'Body';
   let content: React.ReactNode = <BodySettingsPanel doc={doc} onUpdateSettings={onUpdateSettings} />;
-  let showBack = false;
 
   if (selection) {
-    showBack = true;
-    title = selection.type === 'block' ? 'Edit Block' : 'Edit Row';
     content = null;
     if (selection.type === 'block') {
       const block = findBlock(doc, selection.sectionId, selection.columnId, selection.blockId);
@@ -3938,6 +4126,7 @@ function RightInspector({
             block={block}
             onUpdate={(patch) => onUpdateBlock(selection.sectionId, selection.columnId, selection.blockId, patch)}
             onDelete={() => onDeleteBlock(selection.sectionId, selection.columnId, selection.blockId)}
+            onClose={onClearSelection}
           />
         );
       }
@@ -3949,14 +4138,13 @@ function RightInspector({
             section={section}
             onUpdate={(patch) => onUpdateSection(selection.sectionId, patch)}
             onDelete={() => onDeleteSection(selection.sectionId)}
+            onClose={onClearSelection}
           />
         );
       }
     }
     if (!content) {
-      title = 'Body';
       content = <BodySettingsPanel doc={doc} onUpdateSettings={onUpdateSettings} />;
-      showBack = false;
     }
   }
 
@@ -3971,43 +4159,7 @@ function RightInspector({
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          height: 48,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '0 14px',
-          borderBottom: `1px solid ${C.sidebarBorder}`,
-          flexShrink: 0,
-        }}
-      >
-        {showBack && (
-          <button
-            onClick={onClearSelection}
-            title="Close"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 24,
-              height: 24,
-              border: `1px solid ${C.sidebarBorder}`,
-              borderRadius: 4,
-              background: '#ffffff',
-              color: '#18181b',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <ChevronRight size={12} />
-          </button>
-        )}
-        <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: '#09090b' }}>{title}</span>
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {content}
-      </div>
+      {content}
     </div>
   );
 }
@@ -4036,6 +4188,7 @@ export function EmailBlockEditor({
   const [activeTab, setActiveTab] = useState<SidebarTab>('blocks');
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
   const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   // ── Drag state (lifted from Canvas) ────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
@@ -4277,6 +4430,78 @@ export function EmailBlockEditor({
       update({ ...doc, settings: { ...doc.settings, ...patch } });
     },
     [doc, update],
+  );
+
+  // ── Context menu handlers ──────────────────────────────────────────────────
+
+  const handleBlockContextMenu = useCallback(
+    (e: React.MouseEvent, sectionId: string, columnId: string, blockId: string, blockIndex: number, totalBlocks: number, currentAlign?: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY, target: { type: 'block', sectionId, columnId, blockId, blockIndex, totalBlocks, currentAlign } });
+    },
+    [],
+  );
+
+  const handleSectionContextMenu = useCallback(
+    (e: React.MouseEvent, sectionId: string, sectionIndex: number, totalSections: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY, target: { type: 'section', sectionId, sectionIndex, totalSections } });
+    },
+    [],
+  );
+
+  const handleContextMenuAction = useCallback(
+    (action: ContextMenuAction) => {
+      if (!contextMenu) return;
+      const target = contextMenu.target;
+
+      if (target.type === 'block') {
+        const { sectionId, columnId, blockId, blockIndex } = target;
+        if (action.kind === 'delete') {
+          deleteBlock(sectionId, columnId, blockId);
+        } else if (action.kind === 'moveUp' && blockIndex > 0) {
+          update(
+            mapSection(doc, sectionId, (s) => ({
+              ...s,
+              columns: s.columns.map((c) => {
+                if (c.id !== columnId) return c;
+                const blocks = [...c.blocks];
+                [blocks[blockIndex - 1], blocks[blockIndex]] = [blocks[blockIndex], blocks[blockIndex - 1]];
+                return { ...c, blocks };
+              }),
+            })),
+          );
+        } else if (action.kind === 'moveDown' && blockIndex < target.totalBlocks - 1) {
+          update(
+            mapSection(doc, sectionId, (s) => ({
+              ...s,
+              columns: s.columns.map((c) => {
+                if (c.id !== columnId) return c;
+                const blocks = [...c.blocks];
+                [blocks[blockIndex], blocks[blockIndex + 1]] = [blocks[blockIndex + 1], blocks[blockIndex]];
+                return { ...c, blocks };
+              }),
+            })),
+          );
+        } else if (action.kind === 'align') {
+          updateBlock(sectionId, columnId, blockId, { align: action.value } as Partial<EmailBlock>);
+        }
+      } else {
+        const { sectionId, sectionIndex } = target;
+        if (action.kind === 'delete') {
+          deleteSection(sectionId);
+        } else if (action.kind === 'moveUp' && sectionIndex > 0) {
+          moveSection(sectionId, -1);
+        } else if (action.kind === 'moveDown' && sectionIndex < target.totalSections - 1) {
+          moveSection(sectionId, 1);
+        }
+      }
+
+      setContextMenu(null);
+    },
+    [contextMenu, doc, update, deleteBlock, deleteSection, moveSection, updateBlock],
   );
 
   // ── Drag helpers (lifted from Canvas) ──────────────────────────────────────
@@ -4571,6 +4796,8 @@ export function EmailBlockEditor({
           onAddRowAt={addRowAt}
           onMoveSectionToIndex={moveSectionToIndex}
           onClearSelection={() => setSelection(null)}
+          onBlockContextMenu={handleBlockContextMenu}
+          onSectionContextMenu={handleSectionContextMenu}
         />
         {!previewEnabled && (
           <ResizablePanel defaultWidth={320} minWidth={260} maxWidth={500} side="right">
@@ -4618,6 +4845,13 @@ export function EmailBlockEditor({
         ) : null}
       </DragOverlay>
       </DndContext>
+      {contextMenu && (
+        <ContextMenuOverlay
+          menu={contextMenu}
+          onAction={handleContextMenuAction}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
     </PaletteContext.Provider>
   );
