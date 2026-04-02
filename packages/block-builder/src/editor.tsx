@@ -30,6 +30,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  Braces,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +39,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileCode,
   Heading1,
   Image,
   Laptop,
@@ -77,6 +79,7 @@ import { COLOR_PALETTE_KEYS, COLOR_PALETTE_LABELS, DEFAULT_COLOR_PALETTE } from 
 import { createBlock } from './blocks';
 import { createEmptyDocument, normalizeDocument } from './document';
 import { createSectionTemplate, normalizeSection } from './section';
+import { renderEmailDocument } from './render';
 import { nextId } from './utils';
 
 // ─── Colour tokens ───────────────────────────────────────────────────────────
@@ -2837,6 +2840,234 @@ function RailItem({
   );
 }
 
+// ─── Built-in output tabs ────────────────────────────────────────────────────
+
+const codeBlockStyle: React.CSSProperties = {
+  fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace",
+  fontSize: 11,
+  lineHeight: 1.5,
+  background: '#1e1e2e',
+  color: '#cdd6f4',
+  padding: 16,
+  borderRadius: 8,
+  margin: 0,
+  overflow: 'auto',
+  whiteSpace: 'pre',
+  maxHeight: '100%',
+  tabSize: 2,
+};
+
+function JsonViewerPanel({ doc }: { doc: EmailDocument }) {
+  const json = JSON.stringify(doc, null, 2);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(json);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          style={{
+            padding: '4px 10px',
+            border: `1px solid ${C.inspectorBorder}`,
+            borderRadius: 6,
+            background: copied ? '#dcfce7' : '#fafafa',
+            color: copied ? '#166534' : '#52525b',
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <Copy size={12} /> {copied ? 'Copied!' : 'Copy JSON'}
+        </button>
+        <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+          {(json.length / 1024).toFixed(1)} KB
+        </span>
+      </div>
+      <pre style={{ ...codeBlockStyle, flex: 1 }}>{json}</pre>
+    </div>
+  );
+}
+
+function HtmlOutputPanel({ doc }: { doc: EmailDocument }) {
+  const html = renderEmailDocument(doc);
+  const [copied, setCopied] = useState(false);
+  const [viewRaw, setViewRaw] = useState(true);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(html);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          style={{
+            padding: '4px 10px',
+            border: `1px solid ${C.inspectorBorder}`,
+            borderRadius: 6,
+            background: copied ? '#dcfce7' : '#fafafa',
+            color: copied ? '#166534' : '#52525b',
+            cursor: 'pointer',
+            fontSize: 11,
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <Copy size={12} /> {copied ? 'Copied!' : 'Copy HTML'}
+        </button>
+        <div style={{ display: 'flex', gap: 2, background: '#f4f4f5', borderRadius: 6, padding: 2 }}>
+          <button
+            onClick={() => setViewRaw(true)}
+            style={{
+              padding: '3px 8px',
+              border: 'none',
+              borderRadius: 4,
+              background: viewRaw ? '#ffffff' : 'transparent',
+              color: viewRaw ? '#18181b' : '#71717a',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              boxShadow: viewRaw ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
+            }}
+          >
+            Source
+          </button>
+          <button
+            onClick={() => setViewRaw(false)}
+            style={{
+              padding: '3px 8px',
+              border: 'none',
+              borderRadius: 4,
+              background: !viewRaw ? '#ffffff' : 'transparent',
+              color: !viewRaw ? '#18181b' : '#71717a',
+              cursor: 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              boxShadow: !viewRaw ? '0 1px 2px rgba(0,0,0,.05)' : 'none',
+            }}
+          >
+            Preview
+          </button>
+        </div>
+        <span style={{ fontSize: 10, color: '#a1a1aa' }}>
+          {(html.length / 1024).toFixed(1)} KB
+        </span>
+      </div>
+      {viewRaw ? (
+        <pre style={{ ...codeBlockStyle, flex: 1 }}>{html}</pre>
+      ) : (
+        <iframe
+          srcDoc={html}
+          title="HTML Preview"
+          sandbox="allow-same-origin"
+          style={{
+            flex: 1,
+            border: `1px solid ${C.inspectorBorder}`,
+            borderRadius: 8,
+            background: '#ffffff',
+            width: '100%',
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Resizable sidebar wrapper ───────────────────────────────────────────────
+
+function ResizablePanel({
+  children,
+  defaultWidth,
+  minWidth,
+  maxWidth,
+  side,
+}: {
+  children: React.ReactNode;
+  defaultWidth: number;
+  minWidth: number;
+  maxWidth: number;
+  side: 'left' | 'right';
+}) {
+  const [width, setWidth] = useState(defaultWidth);
+  const draggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      draggingRef.current = true;
+      startXRef.current = e.clientX;
+      startWidthRef.current = width;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!draggingRef.current) return;
+        const delta = side === 'left'
+          ? ev.clientX - startXRef.current
+          : startXRef.current - ev.clientX;
+        const next = Math.max(minWidth, Math.min(maxWidth, startWidthRef.current + delta));
+        setWidth(next);
+      };
+
+      const onMouseUp = () => {
+        draggingRef.current = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [width, minWidth, maxWidth, side],
+  );
+
+  const handleSide = side === 'left' ? 'right' : 'left';
+
+  return (
+    <div style={{ width, flexShrink: 0, position: 'relative', display: 'flex' }}>
+      {children}
+      <div
+        onMouseDown={onMouseDown}
+        style={{
+          position: 'absolute',
+          [handleSide]: -3,
+          top: 0,
+          bottom: 0,
+          width: 6,
+          cursor: 'col-resize',
+          zIndex: 50,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            [handleSide]: 2,
+            top: 0,
+            bottom: 0,
+            width: 2,
+            background: 'transparent',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget.style.background) = C.accent; }}
+          onMouseLeave={(e) => { if (!draggingRef.current) e.currentTarget.style.background = 'transparent'; }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({
   activeTab,
   onTabChange,
@@ -2881,7 +3112,7 @@ function Sidebar({
   features: EditorFeatures;
 }) {
   const shellStyle: React.CSSProperties = {
-    width: 380,
+    width: '100%',
     background: '#f5f5f4',
     borderRight: `1px solid ${C.sidebarBorder}`,
     display: 'flex',
@@ -2928,6 +3159,8 @@ function Sidebar({
     ...(features.templates ? [{ id: 'templates' as SidebarTab, label: 'Templates', Icon: Layers }] : []),
     ...(features.treeView ? [{ id: 'tree' as SidebarTab, label: 'Tree', Icon: ListTree }] : []),
     ...(features.bodySettings ? [{ id: 'settings' as SidebarTab, label: 'Body', Icon: TypeIcon }] : []),
+    { id: 'json' as SidebarTab, label: 'JSON', Icon: Braces },
+    { id: 'html' as SidebarTab, label: 'HTML', Icon: FileCode },
     ...(customTabs ?? []).map((tab) => ({
       id: tab.id as SidebarTab,
       label: tab.label,
@@ -3280,6 +3513,22 @@ function Sidebar({
           );
         })}
       </div>,
+    );
+  }
+
+  // ── JSON Viewer tab ─────────────────────────────────────────────────────────
+  if (activeTab === 'json') {
+    return renderShell(
+      'JSON Viewer',
+      <JsonViewerPanel doc={doc} />,
+    );
+  }
+
+  // ── HTML Output tab ────────────────────────────────────────────────────────
+  if (activeTab === 'html') {
+    return renderShell(
+      'HTML Output',
+      <HtmlOutputPanel doc={doc} />,
     );
   }
 
@@ -4158,6 +4407,7 @@ export function EmailBlockEditor({
       >
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {!previewEnabled && (
+          <ResizablePanel defaultWidth={380} minWidth={300} maxWidth={600} side="left">
           <Sidebar
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -4180,6 +4430,7 @@ export function EmailBlockEditor({
             customTabs={customTabs}
             features={features}
           />
+          </ResizablePanel>
         )}
         <Canvas
           doc={doc}
