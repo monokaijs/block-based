@@ -3144,11 +3144,6 @@ function Sidebar({
   onUpdateSettings,
   onAddPrebuilt,
   selection,
-  onUpdateBlock,
-  onDeleteBlock,
-  onUpdateSection,
-  onDeleteSection,
-  onClearSelection,
   onSelectSection,
   onSelectBlock,
   sampleBlocks,
@@ -3165,11 +3160,6 @@ function Sidebar({
   onUpdateSettings: (patch: Partial<EmailDocument['settings']>) => void;
   onAddPrebuilt: (section: EmailSection) => void;
   selection: Selection;
-  onUpdateBlock: (sId: string, cId: string, bId: string, patch: Partial<EmailBlock>) => void;
-  onDeleteBlock: (sId: string, cId: string, bId: string) => void;
-  onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
-  onDeleteSection: (sId: string) => void;
-  onClearSelection: () => void;
   onSelectSection: (sectionId: string) => void;
   onSelectBlock: (sectionId: string, columnId: string, blockId: string) => void;
   sampleBlocks?: SampleBlock[];
@@ -3234,79 +3224,29 @@ function Sidebar({
     })),
   ];
 
-  const renderShell = (title: string, body: React.ReactNode, showBack = false, backLabel = 'Back', hideRail = false) => (
+  const renderShell = (title: string, body: React.ReactNode) => (
     <div style={shellStyle}>
-      {!hideRail && (
-        <div style={railStyle}>
-          {navItems.map((item) => (
-            <RailItem
-              key={item.id}
-              label={item.label}
-              Icon={item.Icon}
-              active={activeTab === item.id}
-              onClick={() => {
-                onClearSelection();
-                onTabChange(item.id);
-              }}
-            />
-          ))}
-        </div>
-      )}
+      <div style={railStyle}>
+        {navItems.map((item) => (
+          <RailItem
+            key={item.id}
+            label={item.label}
+            Icon={item.Icon}
+            active={activeTab === item.id}
+            onClick={() => {
+              onTabChange(item.id);
+            }}
+          />
+        ))}
+      </div>
       <div style={contentPanelStyle}>
         <div style={panelHeaderStyle}>
-          {showBack && (
-            <button
-              onClick={onClearSelection}
-              title={backLabel}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, border: `1px solid ${C.sidebarBorder}`, borderRadius: 4, background: '#ffffff', color: '#18181b', cursor: 'pointer', flexShrink: 0 }}
-            >
-              <ChevronLeft size={12} />
-            </button>
-          )}
           <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: '#09090b' }}>{title}</span>
         </div>
         <div style={panelBodyStyle}>{body}</div>
       </div>
     </div>
   );
-
-  // ── Block selected → show block inspector ──────────────────────────────────
-  if (selection?.type === 'block') {
-    const block = findBlock(doc, selection.sectionId, selection.columnId, selection.blockId);
-    return renderShell(
-      'Edit Block',
-      block ? (
-        <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', margin: '-14px' }}>
-          <BlockInspectorPanel
-            block={block}
-            onUpdate={(patch) => onUpdateBlock(selection.sectionId, selection.columnId, selection.blockId, patch)}
-            onDelete={() => onDeleteBlock(selection.sectionId, selection.columnId, selection.blockId)}
-          />
-        </div>
-      ) : null,
-      true,
-      'Back to panel',
-      true,
-    );
-  }
-
-  // ── Section selected → show section inspector ──────────────────────────────
-  if (selection?.type === 'section') {
-    const section = findSection(doc, selection.sectionId);
-    return renderShell(
-      'Edit Row',
-      section ? (
-        <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', margin: '-14px' }}>
-          <SectionInspectorPanel
-            section={section}
-            onUpdate={(patch) => onUpdateSection(selection.sectionId, patch)}
-            onDelete={() => onDeleteSection(selection.sectionId)}
-          />
-        </div>
-      ) : null,
-      true,
-    );
-  }
 
   if (activeTab === 'sections') {
     return renderShell(
@@ -3953,6 +3893,106 @@ function Canvas({
   );
 }
 
+// ─── Right inspector panel ───────────────────────────────────────────────────
+
+function RightInspector({
+  doc,
+  selection,
+  onUpdateBlock,
+  onDeleteBlock,
+  onUpdateSection,
+  onDeleteSection,
+  onClearSelection,
+}: {
+  doc: EmailDocument;
+  selection: Selection;
+  onUpdateBlock: (sId: string, cId: string, bId: string, patch: Partial<EmailBlock>) => void;
+  onDeleteBlock: (sId: string, cId: string, bId: string) => void;
+  onUpdateSection: (sId: string, patch: Partial<EmailSection>) => void;
+  onDeleteSection: (sId: string) => void;
+  onClearSelection: () => void;
+}) {
+  if (!selection) return null;
+
+  const title = selection.type === 'block' ? 'Edit Block' : 'Edit Row';
+
+  let content: React.ReactNode = null;
+  if (selection.type === 'block') {
+    const block = findBlock(doc, selection.sectionId, selection.columnId, selection.blockId);
+    if (block) {
+      content = (
+        <BlockInspectorPanel
+          block={block}
+          onUpdate={(patch) => onUpdateBlock(selection.sectionId, selection.columnId, selection.blockId, patch)}
+          onDelete={() => onDeleteBlock(selection.sectionId, selection.columnId, selection.blockId)}
+        />
+      );
+    }
+  } else if (selection.type === 'section') {
+    const section = findSection(doc, selection.sectionId);
+    if (section) {
+      content = (
+        <SectionInspectorPanel
+          section={section}
+          onUpdate={(patch) => onUpdateSection(selection.sectionId, patch)}
+          onDelete={() => onDeleteSection(selection.sectionId)}
+        />
+      );
+    }
+  }
+
+  if (!content) return null;
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        background: '#ffffff',
+        borderLeft: `1px solid ${C.sidebarBorder}`,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          height: 48,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 14px',
+          borderBottom: `1px solid ${C.sidebarBorder}`,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onClearSelection}
+          title="Close"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            border: `1px solid ${C.sidebarBorder}`,
+            borderRadius: 4,
+            background: '#ffffff',
+            color: '#18181b',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <ChevronRight size={12} />
+        </button>
+        <span style={{ fontSize: 13, lineHeight: 1, fontWeight: 700, color: '#09090b' }}>{title}</span>
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {content}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main editor component ────────────────────────────────────────────────────
 
 export function EmailBlockEditor({
@@ -4484,11 +4524,6 @@ export function EmailBlockEditor({
             onUpdateSettings={updateSettings}
             onAddPrebuilt={addPrebuiltSection}
             selection={selection}
-            onUpdateBlock={updateBlock}
-            onDeleteBlock={deleteBlock}
-            onUpdateSection={updateSection}
-            onDeleteSection={deleteSection}
-            onClearSelection={() => setSelection(null)}
             onSelectSection={(sId) => setSelection({ type: 'section', sectionId: sId })}
             onSelectBlock={(sId, cId, bId) => setSelection({ type: 'block', sectionId: sId, columnId: cId, blockId: bId })}
             sampleBlocks={sampleBlocks}
@@ -4518,6 +4553,19 @@ export function EmailBlockEditor({
           onMoveSectionToIndex={moveSectionToIndex}
           onClearSelection={() => setSelection(null)}
         />
+        {!previewEnabled && selection && (
+          <ResizablePanel defaultWidth={320} minWidth={260} maxWidth={500} side="right">
+            <RightInspector
+              doc={doc}
+              selection={selection}
+              onUpdateBlock={updateBlock}
+              onDeleteBlock={deleteBlock}
+              onUpdateSection={updateSection}
+              onDeleteSection={deleteSection}
+              onClearSelection={() => setSelection(null)}
+            />
+          </ResizablePanel>
+        )}
       </div>
       <DragOverlay>
         {overlayBlock ? (
