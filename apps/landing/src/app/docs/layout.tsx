@@ -24,9 +24,14 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         <Sidebar />
         <main className="min-w-0 flex-1 prose prose-invert prose-sm max-w-none
           prose-headings:font-bold prose-headings:tracking-tight
-          prose-a:text-primary prose-pre:bg-muted/30 prose-pre:border
+          prose-a:text-primary
           prose-code:before:content-none prose-code:after:content-none
-          prose-code:bg-muted prose-code:rounded prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs">
+          prose-code:bg-muted prose-code:rounded prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs
+          [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:p-4
+          [&_pre]:overflow-x-auto [&_pre]:text-sm [&_pre]:leading-relaxed
+          [&_pre>code]:bg-transparent [&_pre>code]:p-0 [&_pre>code]:text-inherit
+          [&_[data-rehype-pretty-code-figure]]:my-4
+          [&_[data-rehype-pretty-code-figure]_pre]:bg-[#0d1117]">
           {children}
         </main>
       </div>
