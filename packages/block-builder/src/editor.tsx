@@ -125,6 +125,8 @@ type ThemeTokens = {
   dialogShadow: string;
   // Scrollbar (for custom scrollbars if needed)
   scrollbarThumb: string;
+  // Canvas
+  canvasShadow: string;
 };
 
 const LIGHT_THEME: ThemeTokens = {
@@ -153,6 +155,7 @@ const LIGHT_THEME: ThemeTokens = {
   dialogOverlay: 'rgba(0,0,0,0.4)',
   dialogShadow: '0 20px 60px rgba(0,0,0,.2)',
   scrollbarThumb: '#d4d4d8',
+  canvasShadow: '0 4px 24px rgba(0,0,0,.12)',
 };
 
 const DARK_THEME: ThemeTokens = {
@@ -161,7 +164,7 @@ const DARK_THEME: ThemeTokens = {
   bgMuted: '#27272a',
   bgHover: '#27272a',
   bgAccentSubtle: '#0f172a',
-  canvasBg: '#18181b',
+  canvasBg: '#27272a',
   text: '#fafafa',
   textSecondary: '#a1a1aa',
   textMuted: '#71717a',
@@ -181,6 +184,7 @@ const DARK_THEME: ThemeTokens = {
   dialogOverlay: 'rgba(0,0,0,0.6)',
   dialogShadow: '0 20px 60px rgba(0,0,0,.5)',
   scrollbarThumb: '#3f3f46',
+  canvasShadow: '0 4px 24px rgba(0,0,0,.4)',
 };
 
 function getTheme(mode: EditorThemeMode): ThemeTokens {
@@ -4377,7 +4381,7 @@ function Canvas({
           maxWidth: isMobilePreview ? 375 : isTabletPreview ? 768 : '100%',
           minHeight: '100%',
           background: C.bg,
-          boxShadow: '0 4px 24px rgba(0,0,0,.12)',
+          boxShadow: C.canvasShadow,
           borderRadius: 4,
           overflow: 'hidden',
           transition: 'all .25s ease',
