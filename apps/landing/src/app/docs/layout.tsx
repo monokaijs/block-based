@@ -5,15 +5,44 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/components/navbar";
 
-const SIDEBAR = [
-  { title: "Getting Started", href: "/docs" },
-  { title: "EmailBlockEditor", href: "/docs/editor" },
-  { title: "Rendering HTML", href: "/docs/rendering" },
-  { title: "Document Model", href: "/docs/document-model" },
-  { title: "Block Types", href: "/docs/blocks" },
-  { title: "Sections & Layouts", href: "/docs/sections" },
-  { title: "Customization", href: "/docs/customization" },
-  { title: "API Reference", href: "/docs/api" },
+type SidebarItem = { title: string; href: string };
+type SidebarCategory = { label: string; items: SidebarItem[] };
+
+const SIDEBAR: SidebarCategory[] = [
+  {
+    label: "Overview",
+    items: [
+      { title: "Getting Started", href: "/docs" },
+    ],
+  },
+  {
+    label: "Core Concepts",
+    items: [
+      { title: "Document Model", href: "/docs/document-model" },
+      { title: "Block Types", href: "/docs/blocks" },
+      { title: "Sections & Layouts", href: "/docs/sections" },
+    ],
+  },
+  {
+    label: "Components",
+    items: [
+      { title: "EmailBlockEditor", href: "/docs/editor" },
+      { title: "Rendering HTML", href: "/docs/rendering" },
+    ],
+  },
+  {
+    label: "Advanced",
+    items: [
+      { title: "Customization", href: "/docs/customization" },
+      { title: "API Reference", href: "/docs/api" },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { title: "Contact", href: "/docs/contact" },
+    ],
+  },
 ];
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
@@ -46,20 +75,29 @@ function Sidebar() {
 
   return (
     <aside className="hidden md:block w-56 shrink-0">
-      <nav className="sticky top-20 flex flex-col gap-1 text-sm">
-        {SIDEBAR.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "rounded-md px-3 py-1.5 transition-colors hover:text-foreground",
-              pathname === item.href
-                ? "bg-muted text-foreground font-medium"
-                : "text-muted-foreground"
-            )}
-          >
-            {item.title}
-          </Link>
+      <nav className="sticky top-20 flex flex-col gap-5 text-sm">
+        {SIDEBAR.map((category) => (
+          <div key={category.label}>
+            <div className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+              {category.label}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {category.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 transition-colors hover:text-foreground",
+                    pathname === item.href
+                      ? "bg-muted text-foreground font-medium"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
     </aside>
